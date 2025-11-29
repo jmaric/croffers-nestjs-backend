@@ -1,9 +1,15 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service.js';
-import { AuthDto } from './dto/index.js';
+import { AuthDto, ForgotPasswordDto, ResetPasswordDto } from './dto/index.js';
 import * as argon from 'argon2';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -90,5 +96,78 @@ export class AuthService {
       expiresIn: '15m',
       secret: secret,
     });
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+
+    // Don't reveal if user exists or not for security
+    if (!user) {
+      return {
+        message: 'If the email exists, a reset link has been sent',
+      };
+    }
+
+    // Generate a random reset token
+    const resetToken = randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date();
+    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // Token valid for 1 hour
+
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        resetToken,
+        resetTokenExpiry,
+      },
+    });
+
+    // In production, send this token via email
+    // For now, return it in the response (only for development)
+    return {
+      message: 'If the email exists, a reset link has been sent',
+      resetToken, // Remove this in production
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        resetToken: dto.token,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    // Check if token is expired
+    if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    // Hash the new password
+    const hash = await argon.hash(dto.newPassword);
+
+    // Update password and clear reset token
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        hash,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    return {
+      message: 'Password has been reset successfully',
+    };
   }
 }
