@@ -26,6 +26,11 @@ enum UserStatus {
   BANNED
 }
 
+enum ReviewType {
+  GUEST_TO_SUPPLIER // Guest reviewing supplier/service
+  SUPPLIER_TO_GUEST // Supplier reviewing guest
+}
+
 model User {
   id                      Int        @id @default(autoincrement())
   email                   String     @unique
@@ -116,6 +121,9 @@ model Location {
   densityReadings     DensityReading[]
   photos              Photo[]
 
+  @@index([latitude, longitude])
+  @@index([type])
+  @@index([isActive])
   @@map("locations")
 }
 
@@ -199,6 +207,16 @@ model Service {
   reviews              Review[]
   photos               Photo[]
 
+  @@index([name])
+  @@index([type])
+  @@index([status])
+  @@index([isActive])
+  @@index([price])
+  @@index([capacity])
+  @@index([createdAt(sort: Desc)])
+  @@index([supplierId])
+  @@index([type, status, isActive])
+  @@index([price, type])
   @@map("services")
 }
 
@@ -340,6 +358,10 @@ model Booking {
   payments     Payment[]
   review       Review?
 
+  @@index([serviceDate, status])
+  @@index([userId])
+  @@index([supplierId])
+  @@index([status])
   @@map("bookings")
 }
 
@@ -358,6 +380,8 @@ model BookingItem {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id])
 
+  @@index([serviceId])
+  @@index([bookingId])
   @@map("booking_items")
 }
 
@@ -441,26 +465,36 @@ model Event {
 }
 
 model Review {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  serviceId    Int?
-  supplierId   Int?
-  bookingId    Int?     @unique
-  rating       Int // 1-5 stars
-  title        String?
-  comment      String?
-  isVerified   Boolean  @default(false)
-  isVisible    Boolean  @default(true)
-  helpfulVotes Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int // Reviewer (guest or supplier)
+  serviceId Int?
+  supplierId Int?
+  bookingId Int      @unique // Required - only completed bookings can be reviewed
+
+  // Binary rating system
+  reviewType       ReviewType // GUEST_TO_SUPPLIER or SUPPLIER_TO_GUEST
+  wouldRecommend   Boolean // 👍 true / 👎 false (wouldStayAgain for guests, wouldHostAgain for suppliers)
+  tag              String // ONE required tag describing experience
+
+  // 72h delayed publication
+  isPublished Boolean  @default(false)
+  publishAt   DateTime // Auto-publish after 72h
+
+  // Metadata
+  isVerified Boolean  @default(true) // Auto-verified for completed bookings
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
   user     User      @relation(fields: [userId], references: [id])
   service  Service?  @relation(fields: [serviceId], references: [id])
   supplier Supplier? @relation("SupplierReviews", fields: [supplierId], references: [id])
-  booking  Booking?  @relation(fields: [bookingId], references: [id])
+  booking  Booking   @relation(fields: [bookingId], references: [id])
 
+  @@index([serviceId, isPublished])
+  @@index([supplierId, isPublished])
+  @@index([reviewType])
+  @@index([publishAt])
   @@map("reviews")
 }
 
