@@ -10,38 +10,48 @@ import * as argon from 'argon2';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
+import { MailService } from '../src/mail/mail.service.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private mailService: MailService,
   ) {}
 
   async signup(dto: AuthDto) {
     const hash = await argon.hash(dto.password);
 
     try {
+      // Generate email verification token
+      const emailVerificationToken = randomBytes(32).toString('hex');
+      const verificationTokenExpiry = new Date();
+      verificationTokenExpiry.setHours(verificationTokenExpiry.getHours() + 24); // Token valid for 24 hours
+
       const user = await this.prisma.user.create({
         data: {
           email: dto.email,
           hash,
+          emailVerificationToken,
+          verificationTokenExpiry,
+          status: 'INACTIVE', // User starts as inactive until email is verified
         },
       });
 
-      // ✅ Generate JWT token for the new user
-      const token = await this.signToken(user.id, user.email);
+      // Send verification email
+      await this.mailService.sendVerificationEmail(
+        user.email,
+        emailVerificationToken,
+      );
 
       return {
-        access_token: token,
+        message:
+          'Registration successful! Please check your email to verify your account.',
         user: {
           id: user.id,
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-          // hash excluded
+          emailVerified: user.emailVerified,
         },
       };
     } catch (err) {
@@ -67,6 +77,20 @@ export class AuthService {
     const pwMatches = await argon.verify(user.hash, dto.password);
     if (!pwMatches) {
       throw new ForbiddenException('Credentials incorrect');
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      throw new ForbiddenException(
+        'Please verify your email before logging in. Check your inbox for the verification link.',
+      );
+    }
+
+    // Check if user status is ACTIVE
+    if (user.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'Your account is not active. Please contact support.',
+      );
     }
 
     // ✅ Fix: Await the token and return it properly
@@ -127,11 +151,11 @@ export class AuthService {
       },
     });
 
-    // In production, send this token via email
-    // For now, return it in the response (only for development)
+    // Send password reset email
+    await this.mailService.sendPasswordResetEmail(user.email, resetToken);
+
     return {
       message: 'If the email exists, a reset link has been sent',
-      resetToken, // Remove this in production
     };
   }
 
@@ -168,6 +192,57 @@ export class AuthService {
 
     return {
       message: 'Password has been reset successfully',
+    };
+  }
+
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+
+    // Check if token is expired
+    if (
+      !user.verificationTokenExpiry ||
+      user.verificationTokenExpiry < new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+
+    // Check if email is already verified
+    if (user.emailVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    // Update user to mark email as verified and set status to ACTIVE
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        emailVerified: true,
+        status: 'ACTIVE',
+        emailVerificationToken: null,
+        verificationTokenExpiry: null,
+      },
+    });
+
+    // Generate JWT token for the newly verified user
+    const accessToken = await this.signToken(user.id, user.email);
+
+    return {
+      message: 'Email verified successfully! You can now access your account.',
+      access_token: accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        emailVerified: true,
+      },
     };
   }
 }

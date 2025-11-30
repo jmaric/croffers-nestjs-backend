@@ -10,16 +10,547 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+enum UserRole {
+  TOURIST
+  SUPPLIER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
 model User {
+  id                      Int        @id @default(autoincrement())
+  email                   String     @unique
+  firstName               String?
+  lastName                String?
+  hash                    String
+  role                    UserRole   @default(TOURIST)
+  status                  UserStatus @default(INACTIVE)
+  phone                   String?
+  avatar                  String?
+  emailVerified           Boolean    @default(false)
+  emailVerificationToken  String?
+  verificationTokenExpiry DateTime?
+  resetToken              String?
+  resetTokenExpiry        DateTime?
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+
+  // Relations
+  profile       UserProfile?
+  bookings      Booking[]
+  reviews       Review[]
+  suppliers     Supplier[]
+  itineraries   TripItinerary[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  preferences      Json? // Travel preferences, accessibility needs
+  emergencyContact String?
+  nationality      String?
+  passportNumber   String?
+  loyaltyPoints    Int      @default(0)
+  totalSpent       Decimal  @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ============================================
+// LOCATIONS & GEOGRAPHY
+// ============================================
+
+enum LocationType {
+  ISLAND
+  CITY
+  BEACH
+  RESTAURANT
+  NIGHTLIFE
+  ATTRACTION
+  PORT
+  AIRPORT
+}
+
+model Location {
+  id          Int          @id @default(autoincrement())
+  name        String
+  slug        String       @unique
+  type        LocationType
+  description String?
+  latitude    Float
+  longitude   Float
+  address     String?
+  parentId    Int?
+  isActive    Boolean      @default(true)
+  metadata    Json? // Opening hours, capacity, etc.
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  parent   Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children Location[] @relation("LocationHierarchy")
+
+  accommodations      AccommodationService[]
+  tours               TourService[]
+  activities          ActivityService[]
+  transportDepartures TransportService[]     @relation("DepartureLocation")
+  transportArrivals   TransportService[]     @relation("ArrivalLocation")
+  events              Event[]
+  densityReadings     DensityReading[]
+  photos              Photo[]
+
+  @@map("locations")
+}
+
+// ============================================
+// SUPPLIERS & SERVICES
+// ============================================
+
+enum SupplierStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+model Supplier {
+  id                 Int            @id @default(autoincrement())
+  userId             Int
+  businessName       String
+  registrationNum    String?
+  vatNumber          String?
+  status             SupplierStatus @default(PENDING)
+  commissionRate     Float          @default(0.15) // 15% default
+  subscriptionTier   String? // Basic, Premium, Enterprise
+  subscriptionExpiry DateTime?
+  bankAccount        String?
+  payoutSchedule     String?        @default("weekly")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id])
+  services    Service[]
+  bookings    Booking[]
+  reviews     Review[]     @relation("SupplierReviews")
+  commissions Commission[]
+
+  @@map("suppliers")
+}
+
+enum ServiceType {
+  TRANSPORT
+  ACCOMMODATION
+  TOUR
+  ACTIVITY
+  EVENT_TICKET
+}
+
+enum ServiceStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Service {
+  id               Int           @id @default(autoincrement())
+  supplierId       Int
+  type             ServiceType
+  name             String
+  slug             String        @unique
+  description      String?
+  shortDescription String?
+  price            Decimal
+  currency         String        @default("EUR")
+  capacity         Int?
+  duration         Int? // Duration in minutes
+  isActive         Boolean       @default(true)
+  status           ServiceStatus @default(DRAFT)
+  tags             String[]      @default([])
+  metadata         Json? // Service-specific data
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  supplier             Supplier              @relation(fields: [supplierId], references: [id])
+  transportService     TransportService?
+  accommodationService AccommodationService?
+  tourService          TourService?
+  activityService      ActivityService?
+  bookingItems         BookingItem[]
+  reviews              Review[]
+  photos               Photo[]
+
+  @@map("services")
+}
+
+enum TransportType {
+  FERRY
+  SPEEDBOAT
+  TAXI
+  BUS
+  PRIVATE_TRANSFER
+}
+
+model TransportService {
+  id                  Int           @id @default(autoincrement())
+  serviceId           Int           @unique
+  transportType       TransportType
+  departureLocationId Int
+  arrivalLocationId   Int
+  departureTime       DateTime? // For scheduled services
+  arrivalTime         DateTime?
+  isScheduled         Boolean       @default(false)
+  vehicleCapacity     Int?
+  vehicleType         String?
+  amenities           String[]      @default([])
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  service           Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  departureLocation Location @relation("DepartureLocation", fields: [departureLocationId], references: [id])
+  arrivalLocation   Location @relation("ArrivalLocation", fields: [arrivalLocationId], references: [id])
+
+  @@map("transport_services")
+}
+
+enum AccommodationType {
+  VILLA
+  APARTMENT
+  HOTEL
+  GUESTHOUSE
+  HOSTEL
+}
+
+model AccommodationService {
+  id                Int               @id @default(autoincrement())
+  serviceId         Int               @unique
+  locationId        Int
+  accommodationType AccommodationType
+  bedrooms          Int?
+  bathrooms         Int?
+  maxGuests         Int
+  amenities         String[]          @default([])
+  checkInTime       String?
+  checkOutTime      String?
+  minimumStay       Int? // Minimum nights
+  instantBook       Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@map("accommodation_services")
+}
+
+model TourService {
+  id                 Int      @id @default(autoincrement())
+  serviceId          Int      @unique
+  locationId         Int
+  tourType           String // Boat tour, walking tour, wine tour, etc.
+  meetingPoint       String?
+  includes           String[] @default([])
+  excludes           String[] @default([])
+  difficulty         String? // Easy, moderate, hard
+  languages          String[] @default(["en"])
+  groupSizeMax       Int?
+  cancellationPolicy String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@map("tour_services")
+}
+
+model ActivityService {
+  id             Int      @id @default(autoincrement())
+  serviceId      Int      @unique
+  locationId     Int
+  activityType   String // Water sports, nightlife, dining, etc.
+  ageRestriction String?
+  equipment      String[] @default([])
+  skillLevel     String? // Beginner, intermediate, advanced
+  seasonality    String[] @default([]) // Months when available
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@map("activity_services")
+}
+
+// ============================================
+// BOOKINGS & COMMERCE
+// ============================================
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  REFUNDED
+}
+
+model Booking {
+  id                 Int           @id @default(autoincrement())
+  userId             Int
+  supplierId         Int
+  bookingReference   String        @unique @default(cuid())
+  status             BookingStatus @default(PENDING)
+  totalAmount        Decimal
+  currency           String        @default("EUR")
+  commission         Decimal       @default(0)
+  bookingDate        DateTime      @default(now())
+  serviceDate        DateTime
+  notes              String?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id])
+  supplier     Supplier      @relation(fields: [supplierId], references: [id])
+  bookingItems BookingItem[]
+  payments     Payment[]
+  review       Review?
+
+  @@map("bookings")
+}
+
+model BookingItem {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int
+  serviceId  Int
+  quantity   Int      @default(1)
+  unitPrice  Decimal
+  totalPrice Decimal
+  metadata   Json? // Guest details, special requests
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@map("booking_items")
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  STRIPE
+  PAYPAL
+  BANK_TRANSFER
+  CASH
+}
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  bookingId       Int
+  amount          Decimal
+  currency        String        @default("EUR")
+  status          PaymentStatus @default(PENDING)
+  method          PaymentMethod
+  stripePaymentId String?
+  metadata        Json?
+  processedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+model Commission {
   id               Int       @id @default(autoincrement())
-  email            String    @unique
-  firstName        String?
-  lastName         String?
-  hash             String
-  resetToken       String?
-  resetTokenExpiry DateTime?
+  supplierId       Int
+  amount           Decimal
+  rate             Float
+  bookingReference String
+  status           String    @default("pending") // pending, paid, disputed
+  paidAt           DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  @@map("users")
+  // Relations
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("commissions")
+}
+
+// ============================================
+// CONTENT & DISCOVERY
+// ============================================
+
+model Event {
+  id           Int       @id @default(autoincrement())
+  locationId   Int
+  name         String
+  description  String?
+  startDate    DateTime
+  endDate      DateTime?
+  price        Decimal?
+  currency     String    @default("EUR")
+  maxAttendees Int?
+  category     String // Concert, festival, party, cultural
+  organizer    String?
+  website      String?
+  ticketUrl    String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id])
+  photos   Photo[]
+
+  @@map("events")
+}
+
+model Review {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  serviceId    Int?
+  supplierId   Int?
+  bookingId    Int?     @unique
+  rating       Int // 1-5 stars
+  title        String?
+  comment      String?
+  isVerified   Boolean  @default(false)
+  isVisible    Boolean  @default(true)
+  helpfulVotes Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id])
+  service  Service?  @relation(fields: [serviceId], references: [id])
+  supplier Supplier? @relation("SupplierReviews", fields: [supplierId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+
+  @@map("reviews")
+}
+
+model Photo {
+  id         Int      @id @default(autoincrement())
+  serviceId  Int?
+  locationId Int?
+  eventId    Int?
+  url        String
+  altText    String?
+  caption    String?
+  sortOrder  Int      @default(0)
+  isMain     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  service  Service?  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  event    Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("photos")
+}
+
+// ============================================
+// ANALYTICS & INTELLIGENCE
+// ============================================
+
+model DensityReading {
+  id         Int      @id @default(autoincrement())
+  locationId Int
+  density    Float // 0-1 scale (0 = empty, 1 = full capacity)
+  timestamp  DateTime @default(now())
+  source     String // "manual", "instagram", "google", "sensor"
+  metadata   Json? // Additional context data
+  createdAt  DateTime @default(now())
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@map("density_readings")
+}
+
+model TripItinerary {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  name          String
+  description   String?
+  startDate     DateTime
+  endDate       DateTime
+  totalBudget   Decimal?
+  currency      String   @default("EUR")
+  isAIGenerated Boolean  @default(false)
+  isPublic      Boolean  @default(false)
+  data          Json // Structured itinerary data
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("trip_itineraries")
+}
+
+// ============================================
+// SYSTEM
+// ============================================
+
+enum NotificationType {
+  BOOKING_CONFIRMATION
+  PAYMENT_RECEIVED
+  REVIEW_REQUEST
+  DENSITY_ALERT
+  PROMOTIONAL
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
 }

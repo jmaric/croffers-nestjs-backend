@@ -26,3 +26,9 @@ export class ResetPasswordDto {
   @MinLength(8)
   newPassword: string;
 }
+
+export class VerifyEmailDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+}
