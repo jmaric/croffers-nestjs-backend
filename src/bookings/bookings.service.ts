@@ -3,10 +3,13 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { ServicesService } from '../services/services.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   CreateBookingDto,
   UpdateBookingDto,
@@ -25,6 +28,8 @@ export class BookingsService {
     private prisma: PrismaService,
     private mailService: MailService,
     private servicesService: ServicesService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(userId: number, createBookingDto: CreateBookingDto) {
@@ -163,6 +168,21 @@ export class BookingsService {
 
     // Send confirmation email to user and supplier
     await this.mailService.sendBookingConfirmation(booking);
+
+    // Send notifications to guest and supplier
+    await Promise.all([
+      this.notificationsService.notifyBookingConfirmation(
+        userId,
+        booking.id,
+        booking.bookingReference,
+      ),
+      this.notificationsService.notifySupplierNewBooking(
+        supplier.id,
+        booking.id,
+        booking.bookingReference,
+        Number(totalAmount),
+      ),
+    ]);
 
     return booking;
   }

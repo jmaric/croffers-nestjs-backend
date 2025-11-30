@@ -1,0 +1,66 @@
+{
+  "errors": {
+    "notFound": "Ressource nicht gefunden",
+    "unauthorized": "Unbefugter Zugriff",
+    "forbidden": "Zugriff verboten",
+    "badRequest": "Ungültige Anfrage",
+    "internalError": "Interner Serverfehler",
+    "validationFailed": "Validierung fehlgeschlagen"
+  },
+  "auth": {
+    "signupSuccess": "Benutzer erfolgreich erstellt. Bitte überprüfen Sie Ihre E-Mail, um Ihr Konto zu verifizieren.",
+    "loginSuccess": "Anmeldung erfolgreich",
+    "invalidCredentials": "Ungültige Anmeldedaten",
+    "emailNotVerified": "Bitte verifizieren Sie Ihre E-Mail vor der Anmeldung",
+    "accountInactive": "Ihr Konto ist inaktiv",
+    "emailExists": "E-Mail existiert bereits",
+    "verificationSent": "Verifizierungs-E-Mail gesendet",
+    "emailVerified": "E-Mail erfolgreich verifiziert",
+    "passwordResetSent": "Wenn die E-Mail in unserem System vorhanden ist, wurde ein Link zum Zurücksetzen des Passworts gesendet.",
+    "passwordResetSuccess": "Passwort erfolgreich zurückgesetzt. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
+    "invalidToken": "Ungültiger oder abgelaufener Token"
+  },
+  "bookings": {
+    "created": "Buchung erfolgreich erstellt",
+    "confirmed": "Buchung bestätigt",
+    "cancelled": "Buchung storniert",
+    "notFound": "Buchung nicht gefunden",
+    "unauthorized": "Sie haben keine Berechtigung, auf diese Buchung zuzugreifen",
+    "invalidStatus": "Ungültiger Buchungsstatus",
+    "dateInPast": "Das Servicedatum muss in der Zukunft liegen"
+  },
+  "services": {
+    "created": "Service erfolgreich erstellt",
+    "updated": "Service erfolgreich aktualisiert",
+    "deleted": "Service erfolgreich gelöscht",
+    "notFound": "Service nicht gefunden",
+    "unauthorized": "Sie haben keine Berechtigung, diesen Service zu verwalten",
+    "notAvailable": "Service für das ausgewählte Datum nicht verfügbar"
+  },
+  "payments": {
+    "success": "Zahlung erfolgreich",
+    "failed": "Zahlung fehlgeschlagen",
+    "refunded": "Zahlung erstattet",
+    "notFound": "Zahlung nicht gefunden"
+  },
+  "notifications": {
+    "sent": "Benachrichtigung gesendet",
+    "markRead": "Benachrichtigungen als gelesen markiert"
+  },
+  "messages": {
+    "sent": "Nachricht erfolgreich gesendet",
+    "conversationCreated": "Konversation erstellt",
+    "markedAsRead": "Nachrichten als gelesen markiert"
+  },
+  "favorites": {
+    "added": "Zu Favoriten hinzugefügt",
+    "removed": "Aus Favoriten entfernt",
+    "alreadyExists": "Bereits in Favoriten"
+  },
+  "general": {
+    "success": "Vorgang erfolgreich abgeschlossen",
+    "deleted": "Erfolgreich gelöscht",
+    "updated": "Erfolgreich aktualisiert",
+    "created": "Erfolgreich erstellt"
+  }
+}

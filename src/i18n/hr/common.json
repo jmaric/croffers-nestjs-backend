@@ -1,0 +1,66 @@
+{
+  "errors": {
+    "notFound": "Resurs nije pronađen",
+    "unauthorized": "Neovlašteni pristup",
+    "forbidden": "Pristup zabranjen",
+    "badRequest": "Neispravan zahtjev",
+    "internalError": "Interna greška poslužitelja",
+    "validationFailed": "Validacija nije uspjela"
+  },
+  "auth": {
+    "signupSuccess": "Korisnik uspješno kreiran. Molimo provjerite svoj email za verifikaciju računa.",
+    "loginSuccess": "Prijava uspješna",
+    "invalidCredentials": "Neispravne vjerodajnice",
+    "emailNotVerified": "Molimo verifikujte svoj email prije prijave",
+    "accountInactive": "Vaš račun je neaktivan",
+    "emailExists": "Email već postoji",
+    "verificationSent": "Verifikacijski email poslan",
+    "emailVerified": "Email uspješno verificiran",
+    "passwordResetSent": "Ako email postoji u našem sustavu, link za resetiranje lozinke je poslan.",
+    "passwordResetSuccess": "Lozinka uspješno resetirana. Sada se možete prijaviti sa novom lozinkom.",
+    "invalidToken": "Neispravan ili istekao token"
+  },
+  "bookings": {
+    "created": "Rezervacija uspješno kreirana",
+    "confirmed": "Rezervacija potvrđena",
+    "cancelled": "Rezervacija otkazana",
+    "notFound": "Rezervacija nije pronađena",
+    "unauthorized": "Nemate dozvolu za pristup ovoj rezervaciji",
+    "invalidStatus": "Neispravan status rezervacije",
+    "dateInPast": "Datum usluge mora biti u budućnosti"
+  },
+  "services": {
+    "created": "Usluga uspješno kreirana",
+    "updated": "Usluga uspješno ažurirana",
+    "deleted": "Usluga uspješno obrisana",
+    "notFound": "Usluga nije pronađena",
+    "unauthorized": "Nemate dozvolu za upravljanje ovom uslugom",
+    "notAvailable": "Usluga nije dostupna za odabrani datum"
+  },
+  "payments": {
+    "success": "Plaćanje uspješno",
+    "failed": "Plaćanje neuspješno",
+    "refunded": "Plaćanje vraćeno",
+    "notFound": "Plaćanje nije pronađeno"
+  },
+  "notifications": {
+    "sent": "Obavijest poslana",
+    "markRead": "Obavijesti označene kao pročitane"
+  },
+  "messages": {
+    "sent": "Poruka uspješno poslana",
+    "conversationCreated": "Razgovor kreiran",
+    "markedAsRead": "Poruke označene kao pročitane"
+  },
+  "favorites": {
+    "added": "Dodano u favorite",
+    "removed": "Uklonjeno iz favorita",
+    "alreadyExists": "Već je u favoritima"
+  },
+  "general": {
+    "success": "Operacija uspješno završena",
+    "deleted": "Uspješno obrisano",
+    "updated": "Uspješno ažurirano",
+    "created": "Uspješno kreirano"
+  }
+}

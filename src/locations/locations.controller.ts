@@ -9,8 +9,10 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { HttpCacheInterceptor } from '../cache/cache.interceptor.js';
 import { LocationsService } from './locations.service.js';
 import {
   CreateLocationDto,
@@ -35,16 +37,19 @@ export class LocationsController {
   }
 
   @Get()
+  @UseInterceptors(HttpCacheInterceptor)
   findAll(@Query() filterDto: FilterLocationDto) {
     return this.locationsService.findAll(filterDto);
   }
 
   @Get('slug/:slug')
+  @UseInterceptors(HttpCacheInterceptor)
   findBySlug(@Param('slug') slug: string) {
     return this.locationsService.findBySlug(slug);
   }
 
   @Get(':id')
+  @UseInterceptors(HttpCacheInterceptor)
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.locationsService.findOne(id);
   }

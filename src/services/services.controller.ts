@@ -9,8 +9,10 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { HttpCacheInterceptor } from '../cache/cache.interceptor.js';
 import { ServicesService } from './services.service.js';
 import {
   UpdateServiceDto,
@@ -29,6 +31,7 @@ import { JwtGuard } from '../guard/index.js';
 import { RolesGuard } from '../guard/roles.guard.js';
 import { Roles } from '../../auth/decorator/roles.decorator.js';
 import { GetUser } from '../../auth/decorator/get-user.decorator.js';
+import { Language } from '../common/decorators/language.decorator.js';
 import { UserRole, ServiceType } from '../../generated/prisma/client/client.js';
 
 @ApiTags('Services')
@@ -126,16 +129,19 @@ export class ServicesController {
 
   // Common Service Endpoints
   @Get()
-  findAll(@Query() filterDto: FilterServiceDto) {
-    return this.servicesService.findAll(filterDto);
+  @UseInterceptors(HttpCacheInterceptor)
+  findAll(@Query() filterDto: FilterServiceDto, @Language() lang: string) {
+    return this.servicesService.findAll(filterDto, lang);
   }
 
   @Get('slug/:slug')
+  @UseInterceptors(HttpCacheInterceptor)
   findBySlug(@Param('slug') slug: string) {
     return this.servicesService.findBySlug(slug);
   }
 
   @Get(':id')
+  @UseInterceptors(HttpCacheInterceptor)
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.servicesService.findOne(id);
   }

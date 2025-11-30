@@ -3,10 +3,13 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   CreatePaymentIntentDto,
   ProcessPaymentDto,
@@ -28,6 +31,8 @@ export class PaymentsService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private mailService: MailService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
@@ -168,6 +173,22 @@ export class PaymentsService {
 
     // Send payment confirmation email
     await this.mailService.sendPaymentConfirmation(booking, updatedPayment);
+
+    // Send payment notifications to guest and supplier
+    await Promise.all([
+      this.notificationsService.notifyPaymentReceived(
+        userId,
+        booking.id,
+        Number(updatedPayment.amount),
+        updatedPayment.currency,
+      ),
+      this.notificationsService.notifySupplierPayment(
+        booking.supplierId,
+        booking.id,
+        Number(updatedPayment.amount),
+        Number(booking.commission),
+      ),
+    ]);
 
     return updatedPayment;
   }

@@ -1,0 +1,66 @@
+{
+  "errors": {
+    "notFound": "Resource not found",
+    "unauthorized": "Unauthorized access",
+    "forbidden": "Access forbidden",
+    "badRequest": "Invalid request",
+    "internalError": "Internal server error",
+    "validationFailed": "Validation failed"
+  },
+  "auth": {
+    "signupSuccess": "User created successfully. Please check your email to verify your account.",
+    "loginSuccess": "Login successful",
+    "invalidCredentials": "Invalid credentials",
+    "emailNotVerified": "Please verify your email before logging in",
+    "accountInactive": "Your account is inactive",
+    "emailExists": "Email already exists",
+    "verificationSent": "Verification email sent",
+    "emailVerified": "Email verified successfully",
+    "passwordResetSent": "If the email exists in our system, a password reset link has been sent.",
+    "passwordResetSuccess": "Password reset successfully. You can now login with your new password.",
+    "invalidToken": "Invalid or expired token"
+  },
+  "bookings": {
+    "created": "Booking created successfully",
+    "confirmed": "Booking confirmed",
+    "cancelled": "Booking cancelled",
+    "notFound": "Booking not found",
+    "unauthorized": "You do not have permission to access this booking",
+    "invalidStatus": "Invalid booking status",
+    "dateInPast": "Service date must be in the future"
+  },
+  "services": {
+    "created": "Service created successfully",
+    "updated": "Service updated successfully",
+    "deleted": "Service deleted successfully",
+    "notFound": "Service not found",
+    "unauthorized": "You do not have permission to manage this service",
+    "notAvailable": "Service not available for the selected date"
+  },
+  "payments": {
+    "success": "Payment successful",
+    "failed": "Payment failed",
+    "refunded": "Payment refunded",
+    "notFound": "Payment not found"
+  },
+  "notifications": {
+    "sent": "Notification sent",
+    "markRead": "Notifications marked as read"
+  },
+  "messages": {
+    "sent": "Message sent successfully",
+    "conversationCreated": "Conversation created",
+    "markedAsRead": "Messages marked as read"
+  },
+  "favorites": {
+    "added": "Added to favorites",
+    "removed": "Removed from favorites",
+    "alreadyExists": "Already in favorites"
+  },
+  "general": {
+    "success": "Operation completed successfully",
+    "deleted": "Deleted successfully",
+    "updated": "Updated successfully",
+    "created": "Created successfully"
+  }
+}

@@ -1,16 +1,121 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { config } from 'dotenv';
 import { json } from 'express';
+import * as express from 'express';
+import * as path from 'path';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
+import compression from 'compression';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { initializeSentry } from './common/config/sentry.config.js';
+import { SentryFilter } from './common/filters/sentry.filter.js';
+import * as Sentry from '@sentry/node';
 
 config();
+
+// Initialize Sentry before anything else
+initializeSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
   });
+
+  // Use Winston for logging
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
+  // Global exception filter for Sentry
+  app.useGlobalFilters(new SentryFilter());
+
+  // ============================================
+  // API VERSIONING
+  // ============================================
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+    prefix: 'api/v',
+  });
+
+  // ============================================
+  // PERFORMANCE MIDDLEWARE
+  // ============================================
+
+  // Response compression (gzip)
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+      threshold: 1024, // Only compress responses larger than 1KB
+      level: 6, // Compression level (0-9, 6 is default)
+    }),
+  );
+
+  // Serve static files (for local file uploads)
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // ============================================
+  // SECURITY MIDDLEWARE
+  // ============================================
+
+  // Helmet - Security headers
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  // CORS - Configure allowed origins
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:3000', 'http://localhost:3001'];
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+    ],
+    exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
+    maxAge: 3600,
+  });
+
+  // Input Sanitization - Prevent NoSQL injection
+  app.use(
+    mongoSanitize({
+      replaceWith: '_',
+      onSanitize: ({ req, key }) => {
+        console.warn(`Sanitized input detected: ${key} in ${req.path}`);
+      },
+    }),
+  );
 
   // Configure JSON parsing with raw body for webhook
   app.use(
@@ -44,6 +149,10 @@ async function bootstrap() {
     .addTag('Payments', 'Payment processing with Stripe')
     .addTag('Reviews', 'Anti-manipulation review system with trust scores')
     .addTag('Locations', 'Location management and event density data')
+    .addTag('Upload', 'File upload management (S3/Cloudinary/Local)')
+    .addTag('Audit Logs', 'Audit log management and statistics (Admin only)')
+    .addTag('GDPR Compliance', 'Data export, deletion, and consent management')
+    .addTag('Version', 'API version information and changelog')
     .addBearerAuth(
       {
         type: 'http',

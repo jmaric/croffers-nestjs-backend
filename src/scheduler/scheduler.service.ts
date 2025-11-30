@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { BookingStatus } from '../../generated/prisma/client/client.js';
 
 @Injectable()
@@ -11,6 +12,8 @@ export class SchedulerService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   // Run every hour to check for bookings that should be auto-completed
@@ -75,8 +78,15 @@ export class SchedulerService {
             },
           });
 
-          // Send review request email
-          await this.mailService.sendReviewRequest(updatedBooking);
+          // Send review request email and notification
+          await Promise.all([
+            this.mailService.sendReviewRequest(updatedBooking),
+            this.notificationsService.notifyReviewRequest(
+              booking.userId,
+              booking.id,
+              booking.bookingReference,
+            ),
+          ]);
 
           this.logger.log(`Auto-completed booking ${booking.bookingReference}`);
         } catch (error) {

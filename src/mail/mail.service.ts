@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { buildVerificationEmailHtml, buildPasswordResetEmailHtml } from './email-templates.js';
 
 @Injectable()
 export class MailService {
@@ -29,30 +30,17 @@ export class MailService {
     });
   }
 
-  async sendVerificationEmail(email: string, token: string) {
+  async sendVerificationEmail(email: string, token: string, lang: string = 'en') {
     const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
+
+    const { subject, html, text } = buildVerificationEmailHtml(verificationUrl, lang);
 
     const mailOptions = {
       from: process.env.MAIL_FROM || '"Croffers Nest" <noreply@croffersnest.com>',
       to: email,
-      subject: 'Verify your email address',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Welcome to Croffers Nest!</h2>
-          <p>Thank you for signing up. Please verify your email address to activate your account.</p>
-          <p>Click the button below to verify your email:</p>
-          <a href="${verificationUrl}"
-             style="display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0;">
-            Verify Email
-          </a>
-          <p>Or copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
-          <p style="margin-top: 30px; color: #999; font-size: 12px;">
-            This link will expire in 24 hours. If you didn't sign up for Croffers Nest, please ignore this email.
-          </p>
-        </div>
-      `,
-      text: `Welcome to Croffers Nest! Please verify your email by clicking this link: ${verificationUrl}. This link will expire in 24 hours.`,
+      subject,
+      html,
+      text,
     };
 
     try {
@@ -65,30 +53,17 @@ export class MailService {
     }
   }
 
-  async sendPasswordResetEmail(email: string, token: string) {
+  async sendPasswordResetEmail(email: string, token: string, lang: string = 'en') {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+
+    const { subject, html, text } = buildPasswordResetEmailHtml(resetUrl, lang);
 
     const mailOptions = {
       from: process.env.MAIL_FROM || '"Croffers Nest" <noreply@croffersnest.com>',
       to: email,
-      subject: 'Reset your password',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Password Reset Request</h2>
-          <p>We received a request to reset your password.</p>
-          <p>Click the button below to reset your password:</p>
-          <a href="${resetUrl}"
-             style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0;">
-            Reset Password
-          </a>
-          <p>Or copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; color: #666;">${resetUrl}</p>
-          <p style="margin-top: 30px; color: #999; font-size: 12px;">
-            This link will expire in 1 hour. If you didn't request a password reset, please ignore this email.
-          </p>
-        </div>
-      `,
-      text: `Reset your password by clicking this link: ${resetUrl}. This link will expire in 1 hour.`,
+      subject,
+      html,
+      text,
     };
 
     try {

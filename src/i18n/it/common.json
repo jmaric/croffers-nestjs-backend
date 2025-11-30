@@ -1,0 +1,66 @@
+{
+  "errors": {
+    "notFound": "Risorsa non trovata",
+    "unauthorized": "Accesso non autorizzato",
+    "forbidden": "Accesso vietato",
+    "badRequest": "Richiesta non valida",
+    "internalError": "Errore interno del server",
+    "validationFailed": "Validazione fallita"
+  },
+  "auth": {
+    "signupSuccess": "Utente creato con successo. Controlla la tua email per verificare il tuo account.",
+    "loginSuccess": "Accesso effettuato con successo",
+    "invalidCredentials": "Credenziali non valide",
+    "emailNotVerified": "Verifica la tua email prima di accedere",
+    "accountInactive": "Il tuo account è inattivo",
+    "emailExists": "L'email esiste già",
+    "verificationSent": "Email di verifica inviata",
+    "emailVerified": "Email verificata con successo",
+    "passwordResetSent": "Se l'email esiste nel nostro sistema, è stato inviato un link per il reset della password.",
+    "passwordResetSuccess": "Password reimpostata con successo. Ora puoi accedere con la tua nuova password.",
+    "invalidToken": "Token non valido o scaduto"
+  },
+  "bookings": {
+    "created": "Prenotazione creata con successo",
+    "confirmed": "Prenotazione confermata",
+    "cancelled": "Prenotazione annullata",
+    "notFound": "Prenotazione non trovata",
+    "unauthorized": "Non hai il permesso di accedere a questa prenotazione",
+    "invalidStatus": "Stato della prenotazione non valido",
+    "dateInPast": "La data del servizio deve essere nel futuro"
+  },
+  "services": {
+    "created": "Servizio creato con successo",
+    "updated": "Servizio aggiornato con successo",
+    "deleted": "Servizio eliminato con successo",
+    "notFound": "Servizio non trovato",
+    "unauthorized": "Non hai il permesso di gestire questo servizio",
+    "notAvailable": "Servizio non disponibile per la data selezionata"
+  },
+  "payments": {
+    "success": "Pagamento riuscito",
+    "failed": "Pagamento fallito",
+    "refunded": "Pagamento rimborsato",
+    "notFound": "Pagamento non trovato"
+  },
+  "notifications": {
+    "sent": "Notifica inviata",
+    "markRead": "Notifiche segnate come lette"
+  },
+  "messages": {
+    "sent": "Messaggio inviato con successo",
+    "conversationCreated": "Conversazione creata",
+    "markedAsRead": "Messaggi segnati come letti"
+  },
+  "favorites": {
+    "added": "Aggiunto ai preferiti",
+    "removed": "Rimosso dai preferiti",
+    "alreadyExists": "Già nei preferiti"
+  },
+  "general": {
+    "success": "Operazione completata con successo",
+    "deleted": "Eliminato con successo",
+    "updated": "Aggiornato con successo",
+    "created": "Creato con successo"
+  }
+}

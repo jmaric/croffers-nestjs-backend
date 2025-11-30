@@ -46,16 +46,34 @@ model User {
   verificationTokenExpiry DateTime?
   resetToken              String?
   resetTokenExpiry        DateTime?
+
+  // GDPR Compliance
+  privacyPolicyAccepted   Boolean    @default(false)
+  privacyPolicyAcceptedAt DateTime?
+  termsAccepted           Boolean    @default(false)
+  termsAcceptedAt         DateTime?
+  marketingConsent        Boolean    @default(false)
+  marketingConsentAt      DateTime?
+  dataProcessingConsent   Boolean    @default(false)
+  dataProcessingConsentAt DateTime?
+  deletionRequestedAt     DateTime? // Tracks when user requested deletion
+  scheduledDeletionAt     DateTime? // When account will be permanently deleted
+
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
   // Relations
-  profile       UserProfile?
-  bookings      Booking[]
-  reviews       Review[]
-  suppliers     Supplier[]
-  itineraries   TripItinerary[]
-  notifications Notification[]
+  profile              UserProfile?
+  bookings             Booking[]
+  reviews              Review[]
+  suppliers            Supplier[]
+  itineraries          TripItinerary[]
+  notifications        Notification[]
+  guestConversations   Conversation[]  @relation("GuestConversations")
+  supplierConversations Conversation[] @relation("SupplierConversations")
+  messages             Message[]
+  favorites            Favorite[]
+  auditLogs            AuditLog[]
 
   @@map("users")
 }
@@ -94,19 +112,20 @@ enum LocationType {
 }
 
 model Location {
-  id          Int          @id @default(autoincrement())
-  name        String
-  slug        String       @unique
-  type        LocationType
-  description String?
-  latitude    Float
-  longitude   Float
-  address     String?
-  parentId    Int?
-  isActive    Boolean      @default(true)
-  metadata    Json? // Opening hours, capacity, etc.
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id           Int          @id @default(autoincrement())
+  name         String
+  slug         String       @unique
+  type         LocationType
+  description  String?
+  latitude     Float
+  longitude    Float
+  address      String?
+  parentId     Int?
+  isActive     Boolean      @default(true)
+  metadata     Json? // Opening hours, capacity, etc.
+  translations Json? // Multi-language content: { "hr": { "name": "", "description": "" }, "de": {...} }
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   // Relations
   parent   Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
@@ -194,6 +213,7 @@ model Service {
   status           ServiceStatus @default(DRAFT)
   tags             String[]      @default([])
   metadata         Json? // Service-specific data
+  translations     Json? // Multi-language content: { "hr": { "name": "", "description": "" }, "de": {...} }
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -206,6 +226,7 @@ model Service {
   bookingItems         BookingItem[]
   reviews              Review[]
   photos               Photo[]
+  favorites            Favorite[]
 
   @@index([name])
   @@index([type])
@@ -352,11 +373,12 @@ model Booking {
   updatedAt          DateTime      @updatedAt
 
   // Relations
-  user         User          @relation(fields: [userId], references: [id])
-  supplier     Supplier      @relation(fields: [supplierId], references: [id])
-  bookingItems BookingItem[]
-  payments     Payment[]
-  review       Review?
+  user          User          @relation(fields: [userId], references: [id])
+  supplier      Supplier      @relation(fields: [supplierId], references: [id])
+  bookingItems  BookingItem[]
+  payments      Payment[]
+  review        Review?
+  conversations Conversation[]
 
   @@index([serviceDate, status])
   @@index([userId])
@@ -560,6 +582,27 @@ model TripItinerary {
 }
 
 // ============================================
+// FAVORITES/WISHLISTS
+// ============================================
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  serviceId Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([serviceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("favorites")
+}
+
+// ============================================
 // SYSTEM
 // ============================================
 
@@ -587,4 +630,100 @@ model Notification {
   user User @relation(fields: [userId], references: [id])
 
   @@map("notifications")
+}
+
+// ============================================
+// MESSAGING
+// ============================================
+
+model Conversation {
+  id               Int       @id @default(autoincrement())
+  guestId          Int
+  supplierId       Int
+  bookingId        Int? // Optional reference to booking context
+  lastMessageAt    DateTime  @default(now())
+  guestUnreadCount Int       @default(0)
+  supplierUnreadCount Int    @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  guest    User     @relation("GuestConversations", fields: [guestId], references: [id])
+  supplier User     @relation("SupplierConversations", fields: [supplierId], references: [id])
+  booking  Booking? @relation(fields: [bookingId], references: [id])
+  messages Message[]
+
+  @@unique([guestId, supplierId, bookingId])
+  @@index([guestId])
+  @@index([supplierId])
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PAYMENT
+  BOOKING
+  REVIEW
+  UPLOAD
+  DOWNLOAD
+  EXPORT
+  IMPORT
+  PERMISSION_CHANGE
+  STATUS_CHANGE
+  OTHER
+}
+
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  userId      Int? // Nullable for system actions
+  action      AuditAction
+  entity      String // e.g., "User", "Booking", "Service"
+  entityId    Int? // ID of the entity affected
+  description String? // Human-readable description
+  metadata    Json? // Additional context (previous/new values, IP address, etc.)
+  ipAddress   String?
+  userAgent   String?
+  endpoint    String? // API endpoint called
+  method      String? // HTTP method (GET, POST, etc.)
+  statusCode  Int? // HTTP status code
+  createdAt   DateTime    @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
 }

@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service.js';
 import {
   AuthDto,
@@ -13,10 +14,11 @@ import {
 export class AuthController {
   constructor(private authService: AuthService) {}
   @Post('signup')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
   @ApiOperation({
     summary: 'User signup',
     description:
-      'Creates a new user account with hashed password. Sends verification email. User status is INACTIVE until email is verified.',
+      'Creates a new user account with hashed password. Sends verification email. User status is INACTIVE until email is verified. Rate limited to 3 requests per minute.',
   })
   @ApiResponse({
     status: 201,
@@ -45,10 +47,11 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('signin')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   @ApiOperation({
     summary: 'User login',
     description:
-      'Authenticates user with email and password. Returns JWT access token. User must have verified email and ACTIVE status.',
+      'Authenticates user with email and password. Returns JWT access token. User must have verified email and ACTIVE status. Rate limited to 5 requests per minute to prevent brute force attacks.',
   })
   @ApiResponse({
     status: 200,
@@ -102,10 +105,11 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 900000 } }) // 3 requests per 15 minutes
   @ApiOperation({
     summary: 'Request password reset',
     description:
-      'Generates password reset token and sends email. Token expires after 1 hour. Does not reveal if email exists (security).',
+      'Generates password reset token and sends email. Token expires after 1 hour. Does not reveal if email exists (security). Rate limited to 3 requests per 15 minutes.',
   })
   @ApiResponse({
     status: 200,
@@ -123,10 +127,11 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 requests per 15 minutes
   @ApiOperation({
     summary: 'Reset password with token',
     description:
-      'Resets user password using token from forgot-password email. Token is single-use and expires after 1 hour.',
+      'Resets user password using token from forgot-password email. Token is single-use and expires after 1 hour. Rate limited to 5 requests per 15 minutes.',
   })
   @ApiResponse({
     status: 200,

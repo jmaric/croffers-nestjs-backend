@@ -23,10 +23,25 @@ import {
   UserRole,
   SupplierStatus,
 } from '../../generated/prisma/client/client.js';
+import { getTranslatedContent, getTranslatedArray } from '../common/helpers/translation.helper.js';
 
 @Injectable()
 export class ServicesService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Apply translations to a service object based on requested language
+   */
+  private applyTranslations(service: any, lang: string = 'en'): any {
+    return getTranslatedContent(service, lang);
+  }
+
+  /**
+   * Apply translations to an array of services
+   */
+  private applyTranslationsToArray(services: any[], lang: string = 'en'): any[] {
+    return getTranslatedArray(services, lang);
+  }
 
   async create(
     userId: number,
@@ -236,7 +251,7 @@ export class ServicesService {
     });
   }
 
-  async findAll(filterDto: FilterServiceDto) {
+  async findAll(filterDto: FilterServiceDto, lang: string = 'en') {
     const {
       type,
       status,
@@ -416,8 +431,11 @@ export class ServicesService {
     const total = await this.prisma.service.count({ where });
     const filteredTotal = services.length;
 
+    // Apply translations to all services
+    const translatedServices = this.applyTranslationsToArray(services, lang);
+
     return {
-      data: services,
+      data: translatedServices,
       meta: {
         total: filteredTotal,
         originalTotal: total,
