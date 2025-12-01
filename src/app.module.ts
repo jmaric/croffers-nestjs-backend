@@ -31,6 +31,16 @@ import { UploadModule } from './upload/upload.module.js';
 import { CommonModule } from './common/common.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { GdprModule } from './gdpr/gdpr.module.js';
+import { JourneysModule } from './journeys/journeys.module.js';
+import { FerriesModule } from './ferries/ferries.module.js';
+import { EventsModule } from './events/events.module.js';
+import { BusesModule } from './buses/buses.module.js';
+import { CrowdIntelligenceModule } from './crowd-intelligence/crowd-intelligence.module.js';
+import { AdvancedBookingModule } from './advanced-booking/advanced-booking.module.js';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
+import { SupplierPremiumModule } from './supplier-premium/supplier-premium.module.js';
+import { SocialModule } from './social/social.module.js';
+import { AiModule } from './ai/ai.module.js';
 
 @Module({
   imports: [
@@ -59,7 +69,7 @@ import { GdprModule } from './gdpr/gdpr.module.js';
     I18nModule.forRoot({
       fallbackLanguage: 'en',
       loaderOptions: {
-        path: path.join(__dirname, '/i18n/'),
+        path: path.join(process.cwd(), 'src/i18n/'),
         watch: true,
       },
       resolvers: [
@@ -91,6 +101,16 @@ import { GdprModule } from './gdpr/gdpr.module.js';
     CommonModule,
     AuditModule,
     GdprModule,
+    JourneysModule,
+    FerriesModule,
+    EventsModule,
+    BusesModule,
+    CrowdIntelligenceModule,
+    AdvancedBookingModule,
+    SubscriptionsModule,
+    SupplierPremiumModule,
+    SocialModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

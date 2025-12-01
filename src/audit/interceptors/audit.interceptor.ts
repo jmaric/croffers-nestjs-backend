@@ -8,7 +8,7 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Reflector } from '@nestjs/core';
 import { AuditService } from '../audit.service.js';
-import { AuditAction } from '../../../generated/prisma/client/index.js';
+import { AuditAction } from "../../../generated/prisma/client/client.js";
 
 export const AUDIT_LOG_KEY = 'auditLog';
 

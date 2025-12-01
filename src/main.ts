@@ -20,9 +20,7 @@ config();
 initializeSentry();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    rawBody: true,
-  });
+  const app = await NestFactory.create(AppModule);
 
   // Use Winston for logging
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
@@ -108,23 +106,38 @@ async function bootstrap() {
   });
 
   // Input Sanitization - Prevent NoSQL injection
-  app.use(
+  // Skip for Swagger docs to avoid conflicts
+  app.use((req: any, res: any, next: any) => {
+    if (req.path.startsWith('/api/docs') || req.path.startsWith('/api-json')) {
+      return next();
+    }
     mongoSanitize({
       replaceWith: '_',
       onSanitize: ({ req, key }) => {
         console.warn(`Sanitized input detected: ${key} in ${req.path}`);
       },
-    }),
-  );
+    })(req, res, next);
+  });
 
-  // Configure JSON parsing with raw body for webhook
-  app.use(
-    json({
-      verify: (req: any, res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
+  // Configure JSON parsing with raw body for Stripe webhooks
+  app.use((req: any, res: any, next: any) => {
+    if (
+      req.originalUrl === '/api/v1/payments/webhook' ||
+      req.originalUrl === '/api/v1/subscriptions/webhooks/stripe'
+    ) {
+      let data = '';
+      req.setEncoding('utf8');
+      req.on('data', (chunk: string) => {
+        data += chunk;
+      });
+      req.on('end', () => {
+        req.rawBody = data;
+        next();
+      });
+    } else {
+      next();
+    }
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -149,6 +162,16 @@ async function bootstrap() {
     .addTag('Payments', 'Payment processing with Stripe')
     .addTag('Reviews', 'Anti-manipulation review system with trust scores')
     .addTag('Locations', 'Location management and event density data')
+    .addTag('Journeys', 'Multi-modal journey planning from airport to destination')
+    .addTag('Ferries', 'Ferry schedule search and booking for island travel')
+    .addTag('Buses', 'Bus schedule search and booking with operator API integration')
+    .addTag('Events', 'Event discovery for concerts, festivals, beach parties, and nightlife')
+    .addTag('Crowd Intelligence', 'Real-time crowd levels, predictions, and heatmaps powered by Google, Instagram, TikTok, Weather, and IoT sensors')
+    .addTag('Advanced Booking', 'Group bookings with discounts, multi-service packages, flexible date search, price alerts, and booking modifications')
+    .addTag('Subscriptions', 'Tourist premium subscriptions with Stripe integration - €4.99/month or €49/year for 7-day predictions, unlimited price alerts, and more')
+    .addTag('Supplier Premium', 'Supplier à la carte premium add-ons: Analytics Pro (€29/mo), API Access (€49/mo), Marketing Suite (€39/mo), Commission Reduction (€99/mo), Priority Support (€19/mo)')
+    .addTag('Social & Sharing', 'Share itineraries with friends, post travel stories with photos, build your travel network, discover others\' trips, fork itineraries, collaborative planning, and activity feeds')
+    .addTag('AI & Personalization', 'Smart recommendations, personalized suggestions, AI chat assistant, user preferences, dynamic pricing, and behavior tracking')
     .addTag('Upload', 'File upload management (S3/Cloudinary/Local)')
     .addTag('Audit Logs', 'Audit log management and statistics (Admin only)')
     .addTag('GDPR Compliance', 'Data export, deletion, and consent management')

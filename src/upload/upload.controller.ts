@@ -20,9 +20,10 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { UploadService, UploadResult } from './upload.service.js';
+import { UploadService } from './upload.service.js';
+import type { UploadResult } from './upload.service.js';
 import { ImageValidationPipe } from './pipes/file-validation.pipe.js';
-import { JwtGuard } from '../auth/guard/jwt.guard.js';
+import { JwtGuard } from '../guard/index.js';
 
 @ApiTags('Upload')
 @Controller('upload')

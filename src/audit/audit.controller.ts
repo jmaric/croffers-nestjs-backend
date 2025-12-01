@@ -14,11 +14,12 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { AuditService, AuditLogFilterDto } from './audit.service.js';
-import { JwtGuard } from '../auth/guard/jwt.guard.js';
+import { AuditService } from './audit.service.js';
+import type { AuditLogFilterDto } from './audit.service.js';
+import { JwtGuard } from '../guard/index.js';
 import { RolesGuard } from '../guard/roles.guard.js';
-import { Roles } from '../auth/decorator/roles.decorator.js';
-import { UserRole, AuditAction } from '../../generated/prisma/client/index.js';
+import { Roles } from '../../auth/decorator/roles.decorator.js';
+import { UserRole, AuditAction } from '../../generated/prisma/client/client.js';
 
 @ApiTags('Audit Logs')
 @Controller({ path: 'audit-logs', version: '1' })

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { AuditAction } from '../../generated/prisma/client/index.js';
+import { AuditAction } from "../../generated/prisma/client/client.js";
 
 export interface ConsentUpdateDto {
   marketingConsent?: boolean;
@@ -40,55 +40,56 @@ export class GdprService {
    * Export all user data (Right to Access - GDPR Article 15)
    */
   async exportUserData(userId: number): Promise<UserDataExport> {
+    // Fetch user data
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        profile: true,
-        bookings: {
-          include: {
-            service: true,
-            payment: true,
-          },
-        },
-        reviews: true,
-        guestConversations: {
-          include: {
-            messages: true,
-          },
-        },
-        supplierConversations: {
-          include: {
-            messages: true,
-          },
-        },
-        favorites: {
-          include: {
-            service: true,
-          },
-        },
-        itineraries: true,
-        notifications: true,
-        suppliers: true,
-      },
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    // Get audit logs
-    const auditLogs = await this.prisma.auditLog.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Fetch related data separately to avoid complex Prisma types
+    const [
+      profile,
+      bookings,
+      reviews,
+      guestConversations,
+      supplierConversations,
+      favorites,
+      itineraries,
+      notifications,
+      suppliers,
+      auditLogs,
+    ] = await Promise.all([
+      this.prisma.userProfile.findUnique({ where: { userId } }),
+      this.prisma.booking.findMany({ where: { userId } }),
+      this.prisma.review.findMany({ where: { userId } }),
+      this.prisma.conversation.findMany({
+        where: { guestId: userId },
+        include: { messages: true },
+      }),
+      this.prisma.conversation.findMany({
+        where: { supplierId: userId },
+        include: { messages: true },
+      }),
+      this.prisma.favorite.findMany({ where: { userId } }),
+      this.prisma.tripItinerary.findMany({ where: { userId } }),
+      this.prisma.notification.findMany({ where: { userId } }),
+      this.prisma.supplier.findMany({ where: { userId } }),
+      this.prisma.auditLog.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
     // Remove sensitive data
     const { hash, resetToken, emailVerificationToken, ...personalInfo } = user;
 
-    // Combine all messages from both guest and supplier conversations
+    // Combine all messages
     const allMessages = [
-      ...user.guestConversations.flatMap((conv) => conv.messages),
-      ...user.supplierConversations.flatMap((conv) => conv.messages),
+      ...guestConversations.flatMap((conv) => conv.messages),
+      ...supplierConversations.flatMap((conv) => conv.messages),
     ];
 
     const exportData: UserDataExport = {
@@ -97,13 +98,13 @@ export class GdprService {
         dataExportDate: new Date(),
         accountAge: this.calculateAccountAge(user.createdAt),
       },
-      profile: user.profile,
-      bookings: user.bookings,
-      reviews: user.reviews,
+      profile,
+      bookings,
+      reviews,
       messages: allMessages,
-      favorites: user.favorites,
-      itineraries: user.itineraries,
-      notifications: user.notifications,
+      favorites,
+      itineraries,
+      notifications,
       auditLogs: auditLogs.map((log) => ({
         action: log.action,
         entity: log.entity,
@@ -111,7 +112,7 @@ export class GdprService {
         createdAt: log.createdAt,
         ipAddress: log.ipAddress,
       })),
-      suppliers: user.suppliers,
+      suppliers,
       exportedAt: new Date(),
       exportFormat: 'application/json',
     };

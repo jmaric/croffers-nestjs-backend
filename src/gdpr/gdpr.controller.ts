@@ -16,9 +16,10 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { GdprService, ConsentUpdateDto } from './gdpr.service.js';
-import { JwtGuard } from '../auth/guard/jwt.guard.js';
-import { GetUser } from '../auth/decorator/get-user.decorator.js';
+import { GdprService } from './gdpr.service.js';
+import type { ConsentUpdateDto } from './gdpr.service.js';
+import { JwtGuard } from '../guard/index.js';
+import { GetUser } from '../../auth/decorator/get-user.decorator.js';
 import {
   AuditCreate,
   AuditDelete,
