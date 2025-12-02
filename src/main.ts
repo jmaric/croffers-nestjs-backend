@@ -106,18 +106,14 @@ async function bootstrap() {
   });
 
   // Input Sanitization - Prevent NoSQL injection
-  // Skip for Swagger docs to avoid conflicts
-  app.use((req: any, res: any, next: any) => {
-    if (req.path.startsWith('/api/docs') || req.path.startsWith('/api-json')) {
-      return next();
-    }
+  app.use(
     mongoSanitize({
       replaceWith: '_',
       onSanitize: ({ req, key }) => {
         console.warn(`Sanitized input detected: ${key} in ${req.path}`);
       },
-    })(req, res, next);
-  });
+    })
+  );
 
   // Configure JSON parsing with raw body for Stripe webhooks
   app.use((req: any, res: any, next: any) => {
