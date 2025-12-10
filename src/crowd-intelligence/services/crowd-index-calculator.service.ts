@@ -4,8 +4,6 @@ import { CrowdLevel } from '../../../generated/prisma/client/client.js';
 export interface CrowdIndexInput {
   googleLiveScore?: number;
   googleHistoricScore?: number;
-  instagramScore?: number;
-  tiktokScore?: number;
   weatherScore?: number;
   eventScore?: number;
   sensorScore?: number;
@@ -18,8 +16,6 @@ export interface CrowdIndexResult {
   breakdown: {
     googleLive?: number;
     googleHistoric?: number;
-    instagram?: number;
-    tiktok?: number;
     weather?: number;
     event?: number;
     sensor?: number;
@@ -34,8 +30,8 @@ export class CrowdIndexCalculatorService {
    * Calculate Crowd Index based on multiple data sources
    *
    * Algorithm:
-   * Without sensors: GoogleLive (55%) + GoogleHistoric (10%) + Instagram (15%) + TikTok (5%) + Weather (10%) + Event (5%)
-   * With sensors: SensorScore (50%) + GoogleLive (30%) + Instagram (10%) + TikTok (5%) + Weather (3%) + Event (2%)
+   * Without sensors: GoogleLive (55%) + GoogleHistoric (10%) + Weather (25%) + Event (10%)
+   * With sensors: SensorScore (50%) + GoogleLive (25%) + Weather (15%) + Event (10%)
    */
   calculateCrowdIndex(input: CrowdIndexInput): CrowdIndexResult {
     this.logger.debug(`Calculating crowd index with input: ${JSON.stringify(input)}`);
@@ -44,35 +40,27 @@ export class CrowdIndexCalculatorService {
     const breakdown: CrowdIndexResult['breakdown'] = {};
 
     if (input.hasSensors && input.sensorScore !== undefined) {
-      // Algorithm with sensors
+      // Algorithm with sensors (most accurate)
       breakdown.sensor = input.sensorScore * 0.5;
-      breakdown.googleLive = (input.googleLiveScore ?? 0) * 0.3;
-      breakdown.instagram = (input.instagramScore ?? 0) * 0.1;
-      breakdown.tiktok = (input.tiktokScore ?? 0) * 0.05;
-      breakdown.weather = (input.weatherScore ?? 0) * 0.03;
-      breakdown.event = (input.eventScore ?? 0) * 0.02;
+      breakdown.googleLive = (input.googleLiveScore ?? 0) * 0.25;
+      breakdown.weather = (input.weatherScore ?? 0) * 0.15;
+      breakdown.event = (input.eventScore ?? 0) * 0.1;
 
       crowdIndex =
         breakdown.sensor +
         breakdown.googleLive +
-        breakdown.instagram +
-        breakdown.tiktok +
         breakdown.weather +
         breakdown.event;
     } else {
-      // Algorithm without sensors
+      // Algorithm without sensors (Google Popular Times is primary source)
       breakdown.googleLive = (input.googleLiveScore ?? 0) * 0.55;
       breakdown.googleHistoric = (input.googleHistoricScore ?? 0) * 0.1;
-      breakdown.instagram = (input.instagramScore ?? 0) * 0.15;
-      breakdown.tiktok = (input.tiktokScore ?? 0) * 0.05;
-      breakdown.weather = (input.weatherScore ?? 0) * 0.1;
-      breakdown.event = (input.eventScore ?? 0) * 0.05;
+      breakdown.weather = (input.weatherScore ?? 0) * 0.25;
+      breakdown.event = (input.eventScore ?? 0) * 0.1;
 
       crowdIndex =
         breakdown.googleLive +
         breakdown.googleHistoric +
-        breakdown.instagram +
-        breakdown.tiktok +
         breakdown.weather +
         breakdown.event;
     }

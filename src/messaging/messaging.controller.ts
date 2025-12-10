@@ -18,12 +18,16 @@ import {
 } from '@nestjs/swagger';
 import { MessagingService } from './messaging.service.js';
 import { JwtGuard } from '../guard/index.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
 import { GetUser } from '../../auth/decorator/get-user.decorator.js';
 import {
   CreateConversationDto,
   SendMessageDto,
   QueryConversationsDto,
   QueryMessagesDto,
+  FlagMessageDto,
+  AccessConversationDto,
 } from './dto/index.js';
 
 @ApiTags('Messaging')
@@ -266,5 +270,113 @@ export class MessagingController {
     @Param('id', ParseIntPipe) conversationId: number,
   ) {
     return this.messagingService.markMessagesAsRead(userId, conversationId);
+  }
+
+  // ============================================
+  // MESSAGE FLAGGING
+  // ============================================
+
+  @Post('messages/:messageId/flag')
+  @ApiOperation({
+    summary: 'Flag a message for admin review',
+    description: 'User can flag inappropriate or concerning messages.',
+  })
+  @ApiParam({ name: 'messageId', description: 'Message ID', example: 45 })
+  @ApiResponse({ status: 201, description: 'Message flagged successfully' })
+  @ApiResponse({ status: 403, description: 'Access forbidden' })
+  @ApiResponse({ status: 404, description: 'Message not found' })
+  flagMessage(
+    @GetUser('id') userId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @Body() dto: FlagMessageDto,
+  ) {
+    return this.messagingService.flagMessage(userId, messageId, dto.reason);
+  }
+
+  @Get('admin/flagged-messages')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'Get flagged messages (Admin only)',
+    description: 'Admin can view all flagged messages with context.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Flagged messages retrieved',
+  })
+  getFlaggedMessages(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.messagingService.getFlaggedMessages(pageNum, limitNum);
+  }
+
+  @Patch('admin/flagged-messages/:messageId/review')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'Review flagged message (Admin only)',
+    description: 'Admin marks a flagged message as reviewed.',
+  })
+  @ApiParam({ name: 'messageId', description: 'Message ID', example: 45 })
+  @ApiResponse({ status: 200, description: 'Message reviewed' })
+  @ApiResponse({ status: 400, description: 'Message is not flagged' })
+  @ApiResponse({ status: 404, description: 'Message not found' })
+  reviewFlaggedMessage(
+    @GetUser('id') adminId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+  ) {
+    return this.messagingService.reviewFlaggedMessage(adminId, messageId);
+  }
+
+  // ============================================
+  // ADMIN CONVERSATION ACCESS
+  // ============================================
+
+  @Post('admin/conversations/:id/access')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'Admin access conversation with logging',
+    description:
+      'Admin can access any conversation with a reason, which is logged for audit.',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation ID', example: 1 })
+  @ApiResponse({ status: 200, description: 'Conversation accessed' })
+  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  accessConversation(
+    @GetUser('id') adminId: number,
+    @Param('id', ParseIntPipe) conversationId: number,
+    @Body() dto: AccessConversationDto,
+  ) {
+    return this.messagingService.getConversationWithAccess(
+      adminId,
+      conversationId,
+      dto.reason,
+    );
+  }
+
+  @Get('admin/access-logs')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'Get conversation access logs (Admin only)',
+    description: 'Admin can view all conversation access logs.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Access logs retrieved',
+  })
+  getAccessLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('adminId') adminId?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    const adminIdNum = adminId ? parseInt(adminId, 10) : undefined;
+    return this.messagingService.getAccessLogs(pageNum, limitNum, adminIdNum);
   }
 }

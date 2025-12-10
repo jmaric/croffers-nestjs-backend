@@ -1,27 +1,33 @@
 export enum ReviewTag {
-  // Positive tags
-  SUPER_CLEAN = 'Super clean',
-  AMAZING_HOST = 'Amazing host',
-  GREAT_LOCATION = 'Great location',
-  GOOD_VALUE = 'Good value',
-  QUIET_AREA = 'Quiet area',
-  PERFECT_FOR_FAMILIES = 'Perfect for families',
-  EXCELLENT_COMMUNICATION = 'Excellent communication',
-  AS_DESCRIBED = 'As described',
-  HIGHLY_RECOMMEND = 'Highly recommend',
-  PROFESSIONAL_SERVICE = 'Professional service',
+  // Positive tags (matching Prisma schema)
+  SUPER_CLEAN = 'SUPER_CLEAN',
+  AMAZING_HOST = 'AMAZING_HOST',
+  GREAT_LOCATION = 'GREAT_LOCATION',
+  GOOD_VALUE = 'GOOD_VALUE',
+  QUIET_AREA = 'QUIET_AREA',
+  PERFECT_FOR_FAMILIES = 'PERFECT_FOR_FAMILIES',
 
-  // Negative tags
-  NOT_CLEAN = 'Not clean',
-  POOR_COMMUNICATION = 'Poor communication',
-  TOO_NOISY = 'Too noisy',
-  BAD_LOCATION = 'Bad location',
-  PRICE_TOO_HIGH = 'Price too high',
-  NOT_AS_DESCRIBED = 'Not as described',
-  UNPROFESSIONAL = 'Unprofessional',
-  CANCELLED_LAST_MINUTE = 'Cancelled last minute',
-  SAFETY_CONCERNS = 'Safety concerns',
-  MISLEADING_PHOTOS = 'Misleading photos',
+  // Negative tags (matching Prisma schema)
+  NOT_CLEAN = 'NOT_CLEAN',
+  POOR_COMMUNICATION = 'POOR_COMMUNICATION',
+  TOO_NOISY = 'TOO_NOISY',
+  BAD_LOCATION = 'BAD_LOCATION',
+  PRICE_TOO_HIGH = 'PRICE_TOO_HIGH',
+}
+
+// Display labels for the tags
+export const ReviewTagLabels: Record<ReviewTag, string> = {
+  [ReviewTag.SUPER_CLEAN]: 'Super clean',
+  [ReviewTag.AMAZING_HOST]: 'Amazing host',
+  [ReviewTag.GREAT_LOCATION]: 'Great location',
+  [ReviewTag.GOOD_VALUE]: 'Good value',
+  [ReviewTag.QUIET_AREA]: 'Quiet area',
+  [ReviewTag.PERFECT_FOR_FAMILIES]: 'Perfect for families',
+  [ReviewTag.NOT_CLEAN]: 'Not clean',
+  [ReviewTag.POOR_COMMUNICATION]: 'Poor communication',
+  [ReviewTag.TOO_NOISY]: 'Too noisy',
+  [ReviewTag.BAD_LOCATION]: 'Bad location',
+  [ReviewTag.PRICE_TOO_HIGH]: 'Price too high',
 }
 
 export enum GuestReviewTag {

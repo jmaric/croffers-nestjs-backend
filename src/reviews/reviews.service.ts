@@ -10,6 +10,7 @@ import {
   CreateGuestReviewDto,
   FilterReviewDto,
   ReviewTag,
+  ReviewTagLabels,
   GuestReviewTag,
 } from './dto/index.js';
 import {
@@ -62,9 +63,9 @@ export class ReviewsService {
     const serviceId = booking.bookingItems[0]?.service.id;
     const supplierId = booking.supplierId;
 
-    // Calculate publishAt (72 hours from now)
+    // Calculate publishAt (1 minute from now for testing, 72 hours in production)
     const publishAt = new Date();
-    publishAt.setHours(publishAt.getHours() + 72);
+    publishAt.setMinutes(publishAt.getMinutes() + 1); // Change to + 72 hours in production
 
     // Create review
     const review = await this.prisma.review.create({
@@ -159,9 +160,9 @@ export class ReviewsService {
       );
     }
 
-    // Calculate publishAt (72 hours from now)
+    // Calculate publishAt (1 minute from now for testing, 72 hours in production)
     const publishAt = new Date();
-    publishAt.setHours(publishAt.getHours() + 72);
+    publishAt.setMinutes(publishAt.getMinutes() + 1); // Change to + 72 hours in production
 
     // Create guest review
     const review = await this.prisma.review.create({
@@ -171,7 +172,7 @@ export class ReviewsService {
         supplierId: supplier.id,
         reviewType: ReviewType.SUPPLIER_TO_GUEST,
         wouldRecommend: wouldHostAgain,
-        tag,
+        tag: tag as any,
         publishAt,
         isPublished: false,
       },
@@ -226,11 +227,14 @@ export class ReviewsService {
       tagCounts[review.tag] = (tagCounts[review.tag] || 0) + 1;
     });
 
-    // Sort tags by frequency
+    // Sort tags by frequency and convert to human-readable labels
     const topTags = Object.entries(tagCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([tag, count]) => ({ tag, count }));
+      .map(([tag, count]) => ({
+        tag: ReviewTagLabels[tag as ReviewTag] || tag,
+        count
+      }));
 
     return {
       trustScore, // % of guests who would stay again
@@ -275,10 +279,11 @@ export class ReviewsService {
     const negativeTags: string[] = [];
 
     reviews.forEach((review) => {
+      const tagLabel = ReviewTagLabels[review.tag as ReviewTag] || review.tag;
       if (review.wouldRecommend) {
-        positiveTags.push(review.tag);
+        positiveTags.push(tagLabel);
       } else {
-        negativeTags.push(review.tag);
+        negativeTags.push(tagLabel);
       }
     });
 
@@ -316,6 +321,173 @@ export class ReviewsService {
       counts[tag] = (counts[tag] || 0) + 1;
     });
     return counts;
+  }
+
+  // Calculate Trust Score for a service
+  async getServiceTrustScore(serviceId: number) {
+    const reviews = await this.prisma.review.findMany({
+      where: {
+        serviceId,
+        reviewType: ReviewType.GUEST_TO_SUPPLIER,
+        isPublished: true, // Only count published reviews
+      },
+      select: {
+        wouldRecommend: true,
+        tag: true,
+      },
+    });
+
+    if (reviews.length === 0) {
+      return {
+        trustScore: null,
+        totalReviews: 0,
+        positiveReviews: 0,
+        negativeReviews: 0,
+        message: 'No reviews yet',
+      };
+    }
+
+    const positiveReviews = reviews.filter((r) => r.wouldRecommend).length;
+    const negativeReviews = reviews.length - positiveReviews;
+    const trustScore = Math.round((positiveReviews / reviews.length) * 100);
+
+    // Calculate tag frequency
+    const tagCounts: Record<string, number> = {};
+    reviews.forEach((review) => {
+      tagCounts[review.tag] = (tagCounts[review.tag] || 0) + 1;
+    });
+
+    // Sort tags by frequency and convert to human-readable labels
+    const topTags = Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([tag, count]) => ({
+        tag: ReviewTagLabels[tag as ReviewTag] || tag,
+        count
+      }));
+
+    return {
+      trustScore, // % of guests who would stay again
+      totalReviews: reviews.length,
+      positiveReviews,
+      negativeReviews,
+      topTags,
+      quality: this.getTrustScoreQuality(trustScore),
+    };
+  }
+
+  // Get all reviews for a service
+  async findServiceReviews(serviceId: number, filterDto: FilterReviewDto) {
+    const { wouldStayAgain, isPublished = true, page = 1, limit = 20 } = filterDto;
+
+    const where: any = {
+      serviceId,
+      reviewType: ReviewType.GUEST_TO_SUPPLIER,
+      isPublished, // Only show published by default
+    };
+
+    if (wouldStayAgain !== undefined) {
+      where.wouldRecommend = wouldStayAgain;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [reviews, total, trustScore, aiSummary] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          wouldRecommend: true,
+          tag: true,
+          createdAt: true,
+          user: {
+            select: {
+              firstName: true,
+              // Anonymous - no full name or email
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      this.prisma.review.count({ where }),
+      this.getServiceTrustScore(serviceId),
+      this.generateServiceAISummary(serviceId),
+    ]);
+
+    return {
+      trustScore,
+      aiSummary,
+      reviews,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // Generate AI summary from tags for a service
+  async generateServiceAISummary(serviceId: number) {
+    const reviews = await this.prisma.review.findMany({
+      where: {
+        serviceId,
+        reviewType: ReviewType.GUEST_TO_SUPPLIER,
+        isPublished: true,
+      },
+      select: {
+        wouldRecommend: true,
+        tag: true,
+      },
+    });
+
+    if (reviews.length === 0) {
+      return null;
+    }
+
+    // Count positive and negative tags
+    const positiveTags: string[] = [];
+    const negativeTags: string[] = [];
+
+    reviews.forEach((review) => {
+      const tagLabel = ReviewTagLabels[review.tag as ReviewTag] || review.tag;
+      if (review.wouldRecommend) {
+        positiveTags.push(tagLabel);
+      } else {
+        negativeTags.push(tagLabel);
+      }
+    });
+
+    // Get most common tags
+    const positiveTagCounts = this.countTags(positiveTags);
+    const negativeTagCounts = this.countTags(negativeTags);
+
+    const topPositive = Object.entries(positiveTagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([tag]) => tag.toLowerCase());
+
+    const topNegative = Object.entries(negativeTagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([tag]) => tag.toLowerCase());
+
+    // Generate neutral summary
+    let summary = '';
+
+    if (topPositive.length > 0) {
+      summary += `Most guests praised ${topPositive.join(', ')}.`;
+    }
+
+    if (topNegative.length > 0) {
+      summary += ` A minority mentioned ${topNegative.join(' and ')}.`;
+    }
+
+    return summary.trim();
   }
 
   // Get all reviews for a supplier
@@ -410,6 +582,25 @@ export class ReviewsService {
     return {
       serviceTags: Object.values(ReviewTag),
       guestTags: Object.values(GuestReviewTag),
+    };
+  }
+
+  // Check if user has already reviewed a booking
+  async hasBookingReview(userId: number, bookingId: number) {
+    const review = await this.prisma.review.findFirst({
+      where: {
+        userId,
+        bookingId,
+        reviewType: ReviewType.GUEST_TO_SUPPLIER,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return {
+      hasReview: !!review,
+      reviewId: review?.id || null,
     };
   }
 }

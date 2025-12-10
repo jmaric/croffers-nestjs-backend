@@ -3,8 +3,6 @@ import { CrowdIntelligenceController } from './crowd-intelligence.controller.js'
 import { CrowdIntelligenceService } from './services/crowd-intelligence.service.js';
 import { CrowdIndexCalculatorService } from './services/crowd-index-calculator.service.js';
 import { GooglePopularTimesService } from './services/google-popular-times.service.js';
-import { InstagramApiService } from './services/instagram-api.service.js';
-import { TikTokApiService } from './services/tiktok-api.service.js';
 import { WeatherApiService } from './services/weather-api.service.js';
 import { SensorService } from './services/sensor.service.js';
 import { PredictionService } from './services/prediction.service.js';
@@ -18,8 +16,6 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module.js';
     CrowdIntelligenceService,
     CrowdIndexCalculatorService,
     GooglePopularTimesService,
-    InstagramApiService,
-    TikTokApiService,
     WeatherApiService,
     SensorService,
     PredictionService,

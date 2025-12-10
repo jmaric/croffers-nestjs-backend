@@ -1,0 +1,859 @@
+import { PrismaClient } from '../generated/prisma/client/client.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import * as bcrypt from 'bcrypt';
+import 'dotenv/config';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+async function main() {
+  console.log('🌱 Seeding database with comprehensive test data...\n');
+
+  const hash = await bcrypt.hash('password123', 10);
+
+  // ============================================
+  // 1. USERS
+  // ============================================
+
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@croffers.com' },
+    update: {},
+    create: {
+      email: 'admin@croffers.com',
+      hash,
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      emailVerified: true,
+    },
+  });
+  console.log('✅ Admin user');
+
+  const premiumTourist = await prisma.user.upsert({
+    where: { email: 'john@example.com' },
+    update: {},
+    create: {
+      email: 'john@example.com',
+      hash,
+      firstName: 'John',
+      lastName: 'Doe',
+      role: 'TOURIST',
+      status: 'ACTIVE',
+      emailVerified: true,
+      subscriptionTier: 'PREMIUM',
+      subscriptionStatus: 'active',
+      subscriptionStartDate: new Date(),
+      subscriptionEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const freeTourist = await prisma.user.upsert({
+    where: { email: 'sarah@example.com' },
+    update: {},
+    create: {
+      email: 'sarah@example.com',
+      hash,
+      firstName: 'Sarah',
+      lastName: 'Wilson',
+      role: 'TOURIST',
+      status: 'ACTIVE',
+      emailVerified: true,
+      subscriptionTier: 'FREE',
+    },
+  });
+
+  const supplierUser = await prisma.user.upsert({
+    where: { email: 'supplier@example.com' },
+    update: {},
+    create: {
+      email: 'supplier@example.com',
+      hash,
+      firstName: 'Ivan',
+      lastName: 'Horvat',
+      role: 'SUPPLIER',
+      status: 'ACTIVE',
+      emailVerified: true,
+    },
+  });
+
+  console.log('✅ Users (4 total)');
+
+  // ============================================
+  // 2. SUPPLIER
+  // ============================================
+
+  let supplier = await prisma.supplier.findFirst({
+    where: { userId: supplierUser.id },
+  });
+
+  if (!supplier) {
+    supplier = await prisma.supplier.create({
+      data: {
+        userId: supplierUser.id,
+        businessName: 'Adriatic Tours & Experiences',
+        registrationNum: 'HR-123456789',
+        vatNumber: 'HR12345678901',
+        status: 'APPROVED',
+      },
+    });
+  }
+
+  console.log('✅ Supplier');
+
+  // ============================================
+  // 3. LOCATIONS
+  // ============================================
+
+  const dubrovnik = await prisma.location.upsert({
+    where: { slug: 'dubrovnik' },
+    update: {},
+    create: {
+      name: 'Dubrovnik',
+      slug: 'dubrovnik',
+      description: 'The Pearl of the Adriatic',
+      latitude: 42.6507,
+      longitude: 18.0944,
+      type: 'CITY',
+      isActive: true,
+    },
+  });
+
+  const split = await prisma.location.upsert({
+    where: { slug: 'split' },
+    update: {},
+    create: {
+      name: 'Split',
+      slug: 'split',
+      description: "Home to Diocletian's Palace",
+      latitude: 43.5081,
+      longitude: 16.4402,
+      type: 'CITY',
+      isActive: true,
+    },
+  });
+
+  const hvar = await prisma.location.upsert({
+    where: { slug: 'hvar' },
+    update: {},
+    create: {
+      name: 'Hvar',
+      slug: 'hvar',
+      description: 'Sunniest island in Croatia with vibrant nightlife',
+      latitude: 43.1729,
+      longitude: 16.4414,
+      type: 'ISLAND',
+      isActive: true,
+    },
+  });
+
+  const zadar = await prisma.location.upsert({
+    where: { slug: 'zadar' },
+    update: {},
+    create: {
+      name: 'Zadar',
+      slug: 'zadar',
+      description: 'Ancient city with Sea Organ and stunning sunsets',
+      latitude: 44.1194,
+      longitude: 15.2314,
+      type: 'CITY',
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Locations (4 total)');
+
+  // ============================================
+  // 4. SERVICES & PHOTOS
+  // ============================================
+
+  // Accommodation 1: Luxury Villa Dubrovnik
+  const villa1 = await prisma.service.upsert({
+    where: { slug: 'luxury-villa-dubrovnik' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'ACCOMMODATION',
+      name: 'Luxury Villa Dubrovnik Old Town',
+      slug: 'luxury-villa-dubrovnik',
+      description:
+        'Beautiful luxury villa in the heart of Dubrovnik Old Town with stunning sea views. This exclusive property features traditional stone architecture combined with modern amenities.',
+      shortDescription: 'Luxury villa with sea views',
+      price: 250,
+      capacity: 6,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['luxury', 'sea-view', 'old-town', 'pool'],
+      accommodationService: {
+        create: {
+          locationId: dubrovnik.id,
+          accommodationType: 'VILLA',
+          bedrooms: 3,
+          bathrooms: 2,
+          maxGuests: 6,
+          amenities: ['WiFi', 'Air Conditioning', 'Sea View', 'Kitchen', 'Pool', 'Terrace'],
+          checkInTime: '15:00',
+          checkOutTime: '11:00',
+          minimumStay: 2,
+          instantBook: true,
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800',
+            altText: 'Luxury villa exterior',
+            caption: 'Villa with sea view',
+            sortOrder: 0,
+            isMain: true,
+          },
+          {
+            url: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800',
+            altText: 'Living room',
+            caption: 'Spacious living area',
+            sortOrder: 1,
+            isMain: false,
+          },
+          {
+            url: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800',
+            altText: 'Terrace view',
+            caption: 'Sea view terrace',
+            sortOrder: 2,
+            isMain: false,
+          },
+        ],
+      },
+    },
+  });
+
+  // Accommodation 2: Modern Apartment Split
+  const apartment1 = await prisma.service.upsert({
+    where: { slug: 'modern-apartment-split' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'ACCOMMODATION',
+      name: 'Modern Apartment Split Center',
+      slug: 'modern-apartment-split',
+      description:
+        'Stylish modern apartment in the center of Split, 5 minutes walk to the beach and Diocletian\'s Palace.',
+      shortDescription: 'Modern apartment near beach',
+      price: 120,
+      capacity: 4,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['modern', 'city-center', 'beach'],
+      accommodationService: {
+        create: {
+          locationId: split.id,
+          accommodationType: 'APARTMENT',
+          bedrooms: 2,
+          bathrooms: 1,
+          maxGuests: 4,
+          amenities: ['WiFi', 'Air Conditioning', 'Washing Machine', 'Parking'],
+          checkInTime: '14:00',
+          checkOutTime: '10:00',
+          minimumStay: 1,
+          instantBook: false,
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
+            altText: 'Modern apartment interior',
+            caption: 'Contemporary living space',
+            sortOrder: 0,
+            isMain: true,
+          },
+          {
+            url: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800',
+            altText: 'Bedroom',
+            caption: 'Comfortable bedroom',
+            sortOrder: 1,
+            isMain: false,
+          },
+        ],
+      },
+    },
+  });
+
+  // Accommodation 3: Beach House Hvar
+  const beachHouse = await prisma.service.upsert({
+    where: { slug: 'beach-house-hvar' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'ACCOMMODATION',
+      name: 'Beachfront House Hvar',
+      slug: 'beach-house-hvar',
+      description:
+        'Charming beachfront house on Hvar island with direct access to crystal-clear waters.',
+      shortDescription: 'Beachfront with private access',
+      price: 180,
+      capacity: 5,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['beach', 'waterfront', 'family-friendly'],
+      accommodationService: {
+        create: {
+          locationId: hvar.id,
+          accommodationType: 'VILLA',
+          bedrooms: 2,
+          bathrooms: 2,
+          maxGuests: 5,
+          amenities: ['WiFi', 'Air Conditioning', 'Beach Access', 'BBQ', 'Boat Mooring'],
+          checkInTime: '16:00',
+          checkOutTime: '10:00',
+          minimumStay: 3,
+          instantBook: false,
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=800',
+            altText: 'Beach house exterior',
+            caption: 'Your private beach house',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  // Tour 1: Split City Walking Tour
+  const tour1 = await prisma.service.upsert({
+    where: { slug: 'split-city-walking-tour' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'TOUR',
+      name: 'Split City Walking Tour',
+      slug: 'split-city-walking-tour',
+      description:
+        "Explore the historic Diocletian's Palace and Split's old town with a local guide. Discover hidden gems and learn about 1700 years of history.",
+      shortDescription: 'Guided walking tour of Split',
+      price: 35,
+      capacity: 15,
+      duration: 120,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['walking', 'history', 'cultural'],
+      tourService: {
+        create: {
+          locationId: split.id,
+          tourType: 'Walking Tour',
+          meetingPoint: "Diocletian's Palace - Golden Gate",
+          includes: ['Professional guide', 'Entry to palace cellars', 'Historical stories'],
+          excludes: ['Food and drinks', 'Hotel pickup'],
+          difficulty: 'Easy',
+          languages: ['en', 'hr', 'de'],
+          groupSizeMax: 15,
+          cancellationPolicy: 'Free cancellation up to 24 hours before',
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1555990793-da11153b2473?w=800',
+            altText: "Diocletian's Palace",
+            caption: 'Explore ancient Split',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  // Tour 2: Dubrovnik Game of Thrones Tour
+  const tour2 = await prisma.service.upsert({
+    where: { slug: 'dubrovnik-game-of-thrones-tour' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'TOUR',
+      name: 'Game of Thrones Filming Locations Tour',
+      slug: 'dubrovnik-game-of-thrones-tour',
+      description:
+        "Visit iconic Game of Thrones filming locations in Dubrovnik, the real-life King's Landing!",
+      shortDescription: 'GoT filming locations',
+      price: 45,
+      capacity: 20,
+      duration: 150,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['pop-culture', 'walking', 'photography'],
+      tourService: {
+        create: {
+          locationId: dubrovnik.id,
+          tourType: 'Themed Tour',
+          meetingPoint: 'Pile Gate',
+          includes: ['Expert GoT guide', 'Photo opportunities', 'Behind-the-scenes stories'],
+          excludes: ['City walls entrance fee', 'Food'],
+          difficulty: 'Easy',
+          languages: ['en'],
+          groupSizeMax: 20,
+          cancellationPolicy: 'Free cancellation up to 48 hours before',
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=800',
+            altText: 'Dubrovnik city walls',
+            caption: "King's Landing comes alive",
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  // Activity 1: Sea Kayaking Dubrovnik
+  const activity1 = await prisma.service.upsert({
+    where: { slug: 'dubrovnik-sea-kayaking' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'ACTIVITY',
+      name: 'Dubrovnik Sea Kayaking Adventure',
+      slug: 'dubrovnik-sea-kayaking',
+      description:
+        'Paddle around the Dubrovnik city walls and explore hidden caves and beaches.',
+      shortDescription: 'Sea kayaking around city walls',
+      price: 55,
+      capacity: 10,
+      duration: 180,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['adventure', 'water-sports', 'outdoor'],
+      activityService: {
+        create: {
+          locationId: dubrovnik.id,
+          activityType: 'Water Sports',
+          skillLevel: 'Intermediate',
+          equipment: ['Kayak', 'Paddle', 'Life jacket', 'Dry bag', 'Snorkeling gear'],
+          ageRestriction: 'Minimum age 12',
+          seasonality: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+            altText: 'Kayaking in Adriatic',
+            caption: 'Explore from the sea',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  // Activity 2: Wine Tasting Hvar
+  const activity2 = await prisma.service.upsert({
+    where: { slug: 'hvar-wine-tasting' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'ACTIVITY',
+      name: 'Hvar Wine Tasting Experience',
+      slug: 'hvar-wine-tasting',
+      description:
+        'Discover Croatian wines in a traditional Hvar winery. Taste 5 local wines with cheese and prosciutto.',
+      shortDescription: 'Wine tasting with local specialties',
+      price: 40,
+      capacity: 12,
+      duration: 90,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['wine', 'food', 'cultural'],
+      activityService: {
+        create: {
+          locationId: hvar.id,
+          activityType: 'Food & Wine',
+          skillLevel: 'Beginner',
+          equipment: [],
+          ageRestriction: 'Must be 18+',
+          seasonality: ['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800',
+            altText: 'Wine glasses',
+            caption: 'Taste Croatian wines',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  // Transport 1: Ferry Split to Hvar
+  const transport1 = await prisma.service.upsert({
+    where: { slug: 'ferry-split-hvar' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'TRANSPORT',
+      name: 'Ferry from Split to Hvar',
+      slug: 'ferry-split-hvar',
+      description: 'Regular ferry service between Split and Hvar island. Enjoy scenic Adriatic views.',
+      shortDescription: 'Split-Hvar ferry transfer',
+      price: 25,
+      capacity: 200,
+      duration: 120,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['ferry', 'island-hopping'],
+      transportService: {
+        create: {
+          transportType: 'FERRY',
+          departureLocationId: split.id,
+          arrivalLocationId: hvar.id,
+          isScheduled: true,
+          departureTime: new Date('2025-06-01T09:00:00Z'),
+          arrivalTime: new Date('2025-06-01T11:00:00Z'),
+          vehicleCapacity: 200,
+          vehicleType: 'Ferry',
+          amenities: ['Cafe', 'WC', 'Outdoor Deck', 'WiFi'],
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+            altText: 'Ferry on Adriatic',
+            caption: 'Island hopping made easy',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  // Transport 2: Private Transfer Dubrovnik Airport
+  const transport2 = await prisma.service.upsert({
+    where: { slug: 'private-transfer-dubrovnik' },
+    update: {},
+    create: {
+      supplierId: supplier.id,
+      type: 'TRANSPORT',
+      name: 'Private Airport Transfer Dubrovnik',
+      slug: 'private-transfer-dubrovnik',
+      description: 'Comfortable private transfer from Dubrovnik Airport to city center or hotels.',
+      shortDescription: 'Airport transfer service',
+      price: 35,
+      capacity: 4,
+      duration: 30,
+      isActive: true,
+      status: 'ACTIVE',
+      tags: ['airport', 'private', 'transfer'],
+      transportService: {
+        create: {
+          transportType: 'PRIVATE_TRANSFER',
+          departureLocationId: dubrovnik.id,
+          arrivalLocationId: dubrovnik.id,
+          isScheduled: false,
+          vehicleCapacity: 4,
+          vehicleType: 'Sedan',
+          amenities: ['Air Conditioning', 'Luggage Space', 'English-speaking driver'],
+        },
+      },
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800',
+            altText: 'Luxury car',
+            caption: 'Comfortable transfers',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  console.log('✅ Services (10 total with photos)');
+
+  // ============================================
+  // 5. EVENTS
+  // ============================================
+
+  const event1 = await prisma.event.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      locationId: dubrovnik.id,
+      name: 'Dubrovnik Summer Festival',
+      description:
+        'Annual cultural event featuring theater, music, and dance performances in historic venues.',
+      startDate: new Date('2025-07-10'),
+      endDate: new Date('2025-08-25'),
+      price: 0,
+      maxAttendees: 10000,
+      category: 'Cultural',
+      organizer: 'Dubrovnik Summer Festival',
+      website: 'https://www.dubrovnik-festival.hr',
+      isActive: true,
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800',
+            altText: 'Festival performance',
+            caption: 'World-class performances',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  const event2 = await prisma.event.upsert({
+    where: { id: 2 },
+    update: {},
+    create: {
+      locationId: split.id,
+      name: 'Ultra Europe Music Festival',
+      description: 'One of the biggest electronic music festivals in Europe.',
+      startDate: new Date('2025-07-11'),
+      endDate: new Date('2025-07-13'),
+      price: 199,
+      maxAttendees: 100000,
+      category: 'Festival',
+      organizer: 'Ultra Europe',
+      ticketUrl: 'https://ultraeurope.com/tickets',
+      isActive: true,
+      photos: {
+        create: [
+          {
+            url: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+            altText: 'Music festival crowd',
+            caption: 'Epic electronic music festival',
+            sortOrder: 0,
+            isMain: true,
+          },
+        ],
+      },
+    },
+  });
+
+  const event3 = await prisma.event.upsert({
+    where: { id: 3 },
+    update: {},
+    create: {
+      locationId: zadar.id,
+      name: 'Sea Organ Sunset Concert',
+      description: 'Free evening concert at the famous Sea Organ accompanied by stunning sunset.',
+      startDate: new Date('2025-08-15'),
+      endDate: new Date('2025-08-15'),
+      price: 0,
+      category: 'Concert',
+      organizer: 'City of Zadar',
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Events (3 total)');
+
+  // ============================================
+  // 6. REVIEWS
+  // ============================================
+
+  // Completed booking for review (need booking first)
+  const booking1 = await prisma.booking.create({
+    data: {
+      userId: premiumTourist.id,
+      supplierId: supplier.id,
+      reference: 'BK-TEST-001',
+      status: 'COMPLETED',
+      totalPrice: 250,
+      currency: 'EUR',
+      guestName: 'John Doe',
+      guestEmail: 'john@example.com',
+      guestPhone: '+385991234567',
+      groupSize: 2,
+      bookingItems: {
+        create: [
+          {
+            serviceId: villa1.id,
+            serviceName: 'Luxury Villa Dubrovnik Old Town',
+            quantity: 1,
+            unitPrice: 250,
+            totalPrice: 250,
+            checkIn: new Date('2025-05-01'),
+            checkOut: new Date('2025-05-03'),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.review.create({
+    data: {
+      userId: premiumTourist.id,
+      serviceId: villa1.id,
+      supplierId: supplier.id,
+      bookingId: booking1.id,
+      reviewType: 'GUEST_TO_SUPPLIER',
+      wouldRecommend: true,
+      tag: 'Amazing Experience',
+      isPublished: true,
+      publishAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      isVerified: true,
+    },
+  });
+
+  const booking2 = await prisma.booking.create({
+    data: {
+      userId: freeTourist.id,
+      supplierId: supplier.id,
+      reference: 'BK-TEST-002',
+      status: 'COMPLETED',
+      totalPrice: 35,
+      currency: 'EUR',
+      guestName: 'Sarah Wilson',
+      guestEmail: 'sarah@example.com',
+      guestPhone: '+385997654321',
+      groupSize: 1,
+      bookingItems: {
+        create: [
+          {
+            serviceId: tour1.id,
+            serviceName: 'Split City Walking Tour',
+            quantity: 1,
+            unitPrice: 35,
+            totalPrice: 35,
+            checkIn: new Date('2025-04-15'),
+            checkOut: new Date('2025-04-15'),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.review.create({
+    data: {
+      userId: freeTourist.id,
+      serviceId: tour1.id,
+      supplierId: supplier.id,
+      bookingId: booking2.id,
+      reviewType: 'GUEST_TO_SUPPLIER',
+      wouldRecommend: true,
+      tag: 'Great Value',
+      isPublished: true,
+      publishAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      isVerified: true,
+    },
+  });
+
+  console.log('✅ Reviews (2 total)');
+
+  // ============================================
+  // 7. USER PREFERENCES (for AI recommendations)
+  // ============================================
+
+  await prisma.userPreferences.upsert({
+    where: { userId: premiumTourist.id },
+    update: {},
+    create: {
+      userId: premiumTourist.id,
+      travelStyles: ['LUXURY', 'ADVENTURE', 'CULTURAL'],
+      interests: ['BEACHES', 'HISTORY', 'FOOD'],
+      minBudget: 50,
+      maxBudget: 300,
+      currency: 'EUR',
+      preferredStarRating: 4,
+      preferredAmenities: ['WiFi', 'Air Conditioning', 'Sea View', 'Pool'],
+      activityLevelMin: 2,
+      activityLevelMax: 4,
+      preferredDuration: 'full-day',
+    },
+  });
+
+  console.log('✅ User Preferences');
+
+  // ============================================
+  // 8. FAVORITES
+  // ============================================
+
+  await prisma.favorite.upsert({
+    where: {
+      userId_serviceId: {
+        userId: premiumTourist.id,
+        serviceId: beachHouse.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: premiumTourist.id,
+      serviceId: beachHouse.id,
+    },
+  });
+
+  await prisma.favorite.upsert({
+    where: {
+      userId_serviceId: {
+        userId: premiumTourist.id,
+        serviceId: activity2.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: premiumTourist.id,
+      serviceId: activity2.id,
+    },
+  });
+
+  console.log('✅ Favorites (2 total)');
+
+  // ============================================
+  // SUMMARY
+  // ============================================
+
+  console.log('\n🎉 Database seeded successfully!\n');
+  console.log('📋 Test Accounts:');
+  console.log('   Admin:           admin@croffers.com / password123');
+  console.log('   Premium Tourist: john@example.com / password123');
+  console.log('   Free Tourist:    sarah@example.com / password123');
+  console.log('   Supplier:        supplier@example.com / password123');
+  console.log('\n📍 Locations: Dubrovnik, Split, Hvar, Zadar');
+  console.log('\n🏨 Services (10 total):');
+  console.log('   Accommodations: 3 (Villa, Apartment, Beach House)');
+  console.log('   Tours:          2 (Walking Tour, GoT Tour)');
+  console.log('   Activities:     3 (Kayaking, Wine Tasting)');
+  console.log('   Transport:      2 (Ferry, Airport Transfer)');
+  console.log('\n🎭 Events: 3 (Dubrovnik Festival, Ultra Europe, Sea Organ Concert)');
+  console.log('⭐ Reviews: 2 verified reviews');
+  console.log('📸 Photos: 2-3 per service');
+  console.log('❤️  Favorites: 2 items in wishlist');
+  console.log('🧠 User Preferences: Configured for AI recommendations');
+  console.log('\n🚀 API: http://localhost:3333/api/v1');
+  console.log('📚 Docs: http://localhost:3333/api/docs\n');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Error:', e.message);
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

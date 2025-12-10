@@ -44,7 +44,7 @@ export class LocationsService {
   }
 
   async findAll(filterDto: FilterLocationDto) {
-    const { type, parentId, isActive, search, page = 1, limit = 10 } = filterDto;
+    const { type, parentId, isActive, search, serviceLocationsOnly, page = 1, limit = 10 } = filterDto;
 
     const where: any = {};
 
@@ -52,7 +52,14 @@ export class LocationsService {
       where.type = type;
     }
 
-    if (parentId !== undefined) {
+    // Handle parentId filter explicitly
+    // If serviceLocationsOnly is true, get only parent locations (no parentId)
+    if (serviceLocationsOnly === true) {
+      where.parentId = null;
+    } else if (parentId !== undefined) {
+      // null = get only top-level locations (service locations)
+      // number = get children of specific location
+      // undefined = no filter (get all)
       where.parentId = parentId;
     }
 
@@ -178,6 +185,42 @@ export class LocationsService {
     }
 
     return location;
+  }
+
+  async getServiceLocations(page = 1, limit = 100) {
+    // Only get top-level locations (islands & cities) - no child locations
+    const where = {
+      parentId: null,
+      isActive: true,
+    };
+
+    // Ensure page and limit are numbers
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [locations, total] = await Promise.all([
+      this.prisma.location.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: [
+          { type: 'asc' }, // CITY before ISLAND
+          { name: 'asc' },
+        ],
+      }),
+      this.prisma.location.count({ where }),
+    ]);
+
+    return {
+      data: locations,
+      meta: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    };
   }
 
   async findBySlug(slug: string) {

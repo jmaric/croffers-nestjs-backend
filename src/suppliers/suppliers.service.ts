@@ -3,9 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   CreateSupplierDto,
   UpdateSupplierDto,
@@ -19,6 +22,8 @@ export class SuppliersService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(userId: number, createSupplierDto: CreateSupplierDto) {
@@ -44,7 +49,7 @@ export class SuppliersService {
       throw new BadRequestException('User already has a supplier profile');
     }
 
-    return this.prisma.supplier.create({
+    const supplier = await this.prisma.supplier.create({
       data: {
         userId,
         ...createSupplierDto,
@@ -61,6 +66,17 @@ export class SuppliersService {
         },
       },
     });
+
+    // Notify all admins about new supplier application
+    await this.notificationsService.notifyAllAdmins(
+      'SYSTEM_ALERT' as any, // Using SYSTEM_ALERT for admin notifications
+      'New Supplier Application',
+      `${createSupplierDto.businessName} has applied to become a supplier and requires approval.`,
+      `/admin/dashboard?tab=suppliers`,
+      { supplierId: supplier.id, businessName: createSupplierDto.businessName },
+    );
+
+    return supplier;
   }
 
   async findAll(filterDto: FilterSupplierDto) {

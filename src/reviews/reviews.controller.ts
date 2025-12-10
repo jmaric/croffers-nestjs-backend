@@ -109,6 +109,36 @@ export class ReviewsController {
     return this.reviewsService.createGuestReview(userId, createGuestReviewDto);
   }
 
+  @Get('booking/:bookingId/has-review')
+  @UseGuards(JwtGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Check if booking has been reviewed by current user',
+    description: 'Returns whether the current user has already submitted a review for this booking',
+  })
+  @ApiParam({
+    name: 'bookingId',
+    type: 'number',
+    description: 'Booking ID',
+    example: 1,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Review status retrieved successfully',
+    schema: {
+      example: {
+        hasReview: true,
+        reviewId: 1,
+      },
+    },
+  })
+  hasBookingReview(
+    @GetUser('id') userId: number,
+    @Param('bookingId', ParseIntPipe) bookingId: number,
+  ) {
+    return this.reviewsService.hasBookingReview(userId, bookingId);
+  }
+
   @Get('supplier/:supplierId/trust-score')
   @ApiOperation({
     summary: 'Get supplier trust score',
@@ -190,6 +220,53 @@ export class ReviewsController {
     @Query() filterDto: FilterReviewDto,
   ) {
     return this.reviewsService.findSupplierReviews(supplierId, filterDto);
+  }
+
+  @Get('service/:serviceId')
+  @ApiOperation({
+    summary: 'Get all reviews for a service',
+    description:
+      'Returns paginated list of published reviews for a specific service with optional filters. Includes AI-generated summary from tag frequency analysis.',
+  })
+  @ApiParam({
+    name: 'serviceId',
+    type: 'number',
+    description: 'Service ID',
+    example: 1,
+  })
+  @ApiQuery({ name: 'wouldStayAgain', required: false, type: 'boolean', description: 'Filter by positive/negative reviews' })
+  @ApiQuery({ name: 'isPublished', required: false, type: 'boolean', description: 'Filter by publication status (default: true)' })
+  @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 10)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reviews retrieved successfully',
+  })
+  findServiceReviews(
+    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Query() filterDto: FilterReviewDto,
+  ) {
+    return this.reviewsService.findServiceReviews(serviceId, filterDto);
+  }
+
+  @Get('service/:serviceId/trust-score')
+  @ApiOperation({
+    summary: 'Get service trust score',
+    description:
+      'Returns the trust score percentage (% of guests who would recommend) with quality label, total reviews, and top 5 most common tags. Trust score is calculated from published reviews only.',
+  })
+  @ApiParam({
+    name: 'serviceId',
+    type: 'number',
+    description: 'Service ID',
+    example: 1,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service trust score retrieved successfully',
+  })
+  getServiceTrustScore(@Param('serviceId', ParseIntPipe) serviceId: number) {
+    return this.reviewsService.getServiceTrustScore(serviceId);
   }
 
   @Get('guest/:userId/trust-score')

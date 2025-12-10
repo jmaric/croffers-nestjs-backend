@@ -29,21 +29,26 @@ export class HttpCacheInterceptor implements NestInterceptor {
     // Generate cache key from request URL and query params
     const cacheKey = this.generateCacheKey(request);
 
+    console.log('[CACHE] Looking for cache key:', cacheKey);
+
     // Try to get cached response
     const cachedResponse = await this.cacheManager.get(cacheKey);
 
     if (cachedResponse) {
       // Set header to indicate cache hit
       response.set('X-Cache', 'HIT');
+      console.log('[CACHE] HIT for key:', cacheKey);
       return of(cachedResponse);
     }
 
+    console.log('[CACHE] MISS for key:', cacheKey);
     // Set header to indicate cache miss
     response.set('X-Cache', 'MISS');
 
     // Continue with request and cache the response
     return next.handle().pipe(
       tap(async (data) => {
+        console.log('[CACHE] Storing cache key:', cacheKey);
         await this.cacheManager.set(cacheKey, data);
       }),
     );

@@ -129,7 +129,7 @@ export class ServicesController {
 
   // Common Service Endpoints
   @Get()
-  @UseInterceptors(HttpCacheInterceptor)
+  // @UseInterceptors(HttpCacheInterceptor) // Disabled to prevent stale data issues
   findAll(@Query() filterDto: FilterServiceDto, @Language() lang: string) {
     return this.servicesService.findAll(filterDto, lang);
   }

@@ -61,16 +61,6 @@ export class BookingsService {
       );
     }
 
-    // Validate all services belong to the same supplier
-    const supplierIds = [...new Set(services.map((s) => s.supplierId))];
-    if (supplierIds.length > 1) {
-      throw new BadRequestException(
-        'All services in a booking must be from the same supplier',
-      );
-    }
-
-    const supplier = services[0].supplier;
-
     // Check availability for all services
     const serviceDateStr = serviceDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
     const availabilityChecks = await Promise.all(
@@ -93,98 +83,106 @@ export class BookingsService {
       throw new BadRequestException(`Services not available: ${reasons}`);
     }
 
-    // Calculate totals
-    let totalAmount = new Prisma.Decimal(0);
-    const bookingItems = createBookingDto.items.map((item) => {
-      const service = services.find((s) => s.id === item.serviceId);
-      if (!service) {
-        throw new NotFoundException(`Service with ID ${item.serviceId} not found`);
-      }
-      const unitPrice = service.price;
-      const totalPrice = new Prisma.Decimal(unitPrice.toString()).mul(item.quantity);
-      totalAmount = totalAmount.add(totalPrice);
+    // Generate a unique package booking ID if multiple services are being booked together
+    const packageBookingId = createBookingDto.items.length > 1
+      ? `pkg_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      : null;
 
-      return {
-        serviceId: item.serviceId,
-        quantity: item.quantity,
-        unitPrice,
-        totalPrice,
-        metadata: item.metadata,
-      };
-    });
+    // Create ONE booking per service (each service gets its own booking)
+    const bookings = await Promise.all(
+      createBookingDto.items.map(async (item) => {
+        const service = services.find((s) => s.id === item.serviceId);
+        if (!service) {
+          throw new NotFoundException(`Service with ID ${item.serviceId} not found`);
+        }
 
-    // Calculate commission
-    const commission = totalAmount.mul(supplier.commissionRate);
+        const supplier = service.supplier;
+        const unitPrice = service.price;
+        const totalAmount = new Prisma.Decimal(unitPrice.toString()).mul(item.quantity);
+        const commission = totalAmount.mul(supplier.commissionRate);
 
-    // Create booking with items
-    const booking = await this.prisma.booking.create({
-      data: {
-        userId,
-        supplierId: supplier.id,
-        status: BookingStatus.PENDING,
-        totalAmount,
-        commission,
-        serviceDate,
-        notes: createBookingDto.notes,
-        bookingItems: {
-          create: bookingItems,
-        },
-      },
-      include: {
-        bookingItems: {
-          include: {
-            service: {
-              select: {
-                id: true,
-                name: true,
-                type: true,
+        // Create booking for this single service
+        const booking = await this.prisma.booking.create({
+          data: {
+            userId,
+            supplierId: supplier.id,
+            packageBookingId,
+            status: BookingStatus.PENDING,
+            totalAmount,
+            commission,
+            serviceDate,
+            notes: createBookingDto.notes,
+            bookingItems: {
+              create: {
+                serviceId: item.serviceId,
+                quantity: item.quantity,
+                unitPrice,
+                totalPrice: totalAmount,
+                metadata: item.metadata,
               },
             },
           },
-        },
-        supplier: {
-          select: {
-            id: true,
-            businessName: true,
+          include: {
+            bookingItems: {
+              include: {
+                service: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                  },
+                },
+              },
+            },
+            supplier: {
+              select: {
+                id: true,
+                businessName: true,
+                user: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
             user: {
               select: {
+                id: true,
                 email: true,
                 firstName: true,
                 lastName: true,
               },
             },
           },
-        },
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    });
+        });
 
-    // Send confirmation email to user and supplier
-    await this.mailService.sendBookingConfirmation(booking);
+        // Send confirmation email to supplier
+        await this.mailService.sendBookingConfirmation(booking);
 
-    // Send notifications to guest and supplier
-    await Promise.all([
-      this.notificationsService.notifyBookingConfirmation(
-        userId,
-        booking.id,
-        booking.bookingReference,
-      ),
-      this.notificationsService.notifySupplierNewBooking(
-        supplier.id,
-        booking.id,
-        booking.bookingReference,
-        Number(totalAmount),
-      ),
-    ]);
+        // Send notification to supplier
+        await this.notificationsService.notifySupplierNewBooking(
+          supplier.id,
+          booking.id,
+          booking.bookingReference,
+          Number(totalAmount),
+        );
 
-    return booking;
+        return booking;
+      })
+    );
+
+    // Send notification to guest about the booking(s)
+    const firstBooking = bookings[0];
+    await this.notificationsService.notifyBookingConfirmation(
+      userId,
+      firstBooking.id,
+      packageBookingId || firstBooking.bookingReference,
+    );
+
+    // Return all bookings (for package) or single booking
+    return createBookingDto.items.length > 1 ? bookings : bookings[0];
   }
 
   async findAll(filterDto: FilterBookingDto) {
@@ -201,7 +199,15 @@ export class BookingsService {
     const where: any = {};
 
     if (userId) where.userId = userId;
-    if (supplierId) where.supplierId = supplierId;
+    if (supplierId) {
+      where.bookingItems = {
+        some: {
+          service: {
+            supplierId: supplierId,
+          },
+        },
+      };
+    }
     if (status) where.status = status;
 
     if (dateFrom || dateTo) {
@@ -221,10 +227,40 @@ export class BookingsService {
           bookingItems: {
             include: {
               service: {
-                select: {
-                  id: true,
-                  name: true,
-                  type: true,
+                include: {
+                  photos: {
+                    orderBy: {
+                      sortOrder: 'asc',
+                    },
+                  },
+                  transportService: {
+                    include: {
+                      departureLocation: true,
+                      arrivalLocation: true,
+                    },
+                  },
+                  accommodationService: {
+                    include: {
+                      location: true,
+                    },
+                  },
+                  tourService: {
+                    include: {
+                      location: true,
+                    },
+                  },
+                  activityService: {
+                    include: {
+                      location: true,
+                    },
+                  },
+                  supplier: {
+                    select: {
+                      id: true,
+                      businessName: true,
+                      status: true,
+                    },
+                  },
                 },
               },
             },
@@ -490,6 +526,20 @@ export class BookingsService {
     // Send confirmation email
     await this.mailService.sendBookingConfirmation(updated);
 
+    // Send notification to guest about booking confirmation
+    await this.notificationsService.create({
+      userId: booking.userId,
+      type: 'BOOKING_CONFIRMATION',
+      title: 'Booking Confirmed',
+      message: `Your booking ${updated.bookingReference} has been confirmed by ${booking.supplier.businessName}`,
+      actionUrl: `/bookings/${id}`,
+      metadata: {
+        bookingId: id,
+        bookingReference: updated.bookingReference,
+        supplierName: booking.supplier.businessName,
+      },
+    });
+
     return updated;
   }
 
@@ -556,6 +606,121 @@ export class BookingsService {
 
     // Send cancellation email
     await this.mailService.sendBookingCancellation(updated);
+
+    // Send notification to the other party (guest if supplier cancelled, supplier if guest cancelled)
+    if (isSupplier) {
+      // Supplier cancelled - notify guest
+      const isPartOfPackage = !!booking.packageBookingId;
+      const packageMessage = isPartOfPackage
+        ? ' This service was part of your travel package. You may need to find an alternative.'
+        : '';
+
+      await this.notificationsService.create({
+        userId: booking.userId,
+        type: 'BOOKING_CONFIRMATION' as any,
+        title: isPartOfPackage ? 'Service Cancelled in Your Package' : 'Booking Cancelled',
+        message: `Your booking ${updated.bookingReference} with ${booking.supplier.businessName} has been cancelled by the supplier${cancelBookingDto.cancellationReason ? `: ${cancelBookingDto.cancellationReason}` : ''}.${packageMessage}`,
+        actionUrl: `/bookings/${id}`,
+        metadata: {
+          bookingId: id,
+          bookingReference: updated.bookingReference,
+          packageBookingId: booking.packageBookingId,
+          cancellationReason: cancelBookingDto.cancellationReason,
+          isPartOfPackage,
+        },
+      });
+    } else if (isOwner) {
+      // Guest cancelled - notify supplier
+      await this.notificationsService.create({
+        userId: booking.supplier.userId,
+        type: 'BOOKING_CONFIRMATION' as any,
+        title: 'Booking Cancelled',
+        message: `Booking ${updated.bookingReference} has been cancelled by the guest${cancelBookingDto.cancellationReason ? `: ${cancelBookingDto.cancellationReason}` : ''}`,
+        actionUrl: `/bookings/${id}`,
+        metadata: {
+          bookingId: id,
+          bookingReference: updated.bookingReference,
+          cancellationReason: cancelBookingDto.cancellationReason,
+        },
+      });
+    }
+
+    // If booking is part of a journey package, update journey segments and status
+    if (booking.packageBookingId) {
+      // Find all segments related to this booking
+      const segments = await this.prisma.journeySegment.findMany({
+        where: { bookingId: id },
+        include: { journey: true },
+      });
+
+      if (segments.length > 0) {
+        // Mark segments as cancelled
+        await this.prisma.journeySegment.updateMany({
+          where: { bookingId: id },
+          data: {
+            isCancelled: true,
+            cancelledAt: new Date(),
+            cancellationReason: cancelBookingDto.cancellationReason,
+          },
+        });
+
+        const journeyId = segments[0].journeyId;
+
+        // Get all segments in the journey to check if all bookings are cancelled
+        const allSegments = await this.prisma.journeySegment.findMany({
+          where: { journeyId },
+          include: { booking: true },
+        });
+
+        // Check if all bookings are cancelled
+        const allBookingsCancelled = allSegments.every(
+          (segment) =>
+            !segment.booking || segment.booking.status === 'CANCELLED',
+        );
+
+        if (allBookingsCancelled) {
+          // All bookings cancelled - mark journey as CANCELLED
+          await this.prisma.journey.update({
+            where: { id: journeyId },
+            data: { status: 'CANCELLED' as any },
+          });
+
+          console.log(
+            `[BookingsService] Journey ${journeyId} marked as CANCELLED - all bookings cancelled`,
+          );
+        } else if (isSupplier) {
+          // Supplier cancelled one booking but others remain - mark as PENDING_CHANGES
+          await this.prisma.journey.update({
+            where: { id: journeyId },
+            data: { status: 'PENDING_CHANGES' as any },
+          });
+
+          console.log(
+            `[BookingsService] Journey ${journeyId} marked as PENDING_CHANGES due to supplier cancellation of booking ${id}`,
+          );
+        } else {
+          // Guest cancelled one booking - check if any remain active
+          const hasActiveBookings = allSegments.some(
+            (segment) =>
+              segment.booking &&
+              (segment.booking.status === 'PENDING' ||
+                segment.booking.status === 'CONFIRMED'),
+          );
+
+          if (!hasActiveBookings) {
+            // No active bookings remain - mark as CANCELLED
+            await this.prisma.journey.update({
+              where: { id: journeyId },
+              data: { status: 'CANCELLED' as any },
+            });
+
+            console.log(
+              `[BookingsService] Journey ${journeyId} marked as CANCELLED - no active bookings remain`,
+            );
+          }
+        }
+      }
+    }
 
     return updated;
   }

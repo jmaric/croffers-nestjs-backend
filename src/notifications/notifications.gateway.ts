@@ -153,8 +153,14 @@ export class NotificationsGateway
   // ============================================
 
   sendNotificationToUser(userId: number, notification: any) {
-    this.server.to(`user:${userId}`).emit('notification', notification);
+    const room = `user:${userId}`;
+    console.log('📡 [NotificationsGateway] Emitting notification to room:', room);
+    console.log('📡 [NotificationsGateway] Notification data:', { id: notification.id, title: notification.title });
+
+    this.server.to(room).emit('notification', notification);
     this.logger.debug(`Notification sent to user ${userId}:`, notification.title);
+
+    console.log('📡 [NotificationsGateway] Notification emitted successfully');
   }
 
   // Send notification to multiple users
@@ -172,8 +178,13 @@ export class NotificationsGateway
 
   // Send unread count update
   sendUnreadCountUpdate(userId: number, count: number) {
-    this.server.to(`user:${userId}`).emit('unreadCount', { unreadCount: count });
+    const room = `user:${userId}`;
+    console.log('📊 [NotificationsGateway] Emitting unread count to room:', room, 'Count:', count);
+
+    this.server.to(room).emit('unreadCount', { unreadCount: count });
     this.logger.debug(`Unread count update sent to user ${userId}: ${count}`);
+
+    console.log('📊 [NotificationsGateway] Unread count emitted successfully');
   }
 
   // Check if user is connected

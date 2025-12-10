@@ -11,15 +11,6 @@ export class DataSourceScores {
   })
   googleHistoric?: number;
 
-  @ApiPropertyOptional({
-    description: 'Instagram trend score (0-100)',
-    example: 80,
-  })
-  instagram?: number;
-
-  @ApiPropertyOptional({ description: 'TikTok trend score (0-100)', example: 70 })
-  tiktok?: number;
-
   @ApiPropertyOptional({ description: 'Weather score (0-100)', example: 90 })
   weather?: number;
 

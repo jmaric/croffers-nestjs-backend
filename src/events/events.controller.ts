@@ -194,7 +194,7 @@ export class EventsController {
     description: 'Unauthorized - JWT token required',
   })
   async createEvent(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() dto: CreateEventDto,
   ): Promise<EventResponseDto> {
     return this.eventsService.createEvent(dto, userId);
@@ -226,7 +226,7 @@ export class EventsController {
     description: 'Unauthorized',
   })
   async updateEvent(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateEventDto,
   ): Promise<EventResponseDto> {
@@ -259,7 +259,7 @@ export class EventsController {
     description: 'Unauthorized',
   })
   async deleteEvent(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<void> {
     return this.eventsService.deleteEvent(id, userId);

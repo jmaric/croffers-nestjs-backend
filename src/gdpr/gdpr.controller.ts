@@ -48,7 +48,7 @@ export class GdprController {
     'Content-Disposition',
     'attachment; filename="user-data-export.json"',
   )
-  async exportData(@GetUser('sub') userId: number) {
+  async exportData(@GetUser('id') userId: number) {
     return this.gdprService.exportUserData(userId);
   }
 
@@ -71,7 +71,7 @@ export class GdprController {
     },
   })
   @AuditDelete('User', 'Account deletion requested')
-  async requestDeletion(@GetUser('sub') userId: number) {
+  async requestDeletion(@GetUser('id') userId: number) {
     return this.gdprService.requestDeletion(userId);
   }
 
@@ -85,7 +85,7 @@ export class GdprController {
     status: 200,
     description: 'Deletion request cancelled successfully',
   })
-  async cancelDeletion(@GetUser('sub') userId: number) {
+  async cancelDeletion(@GetUser('id') userId: number) {
     return this.gdprService.cancelDeletion(userId);
   }
 
@@ -101,7 +101,7 @@ export class GdprController {
   })
   @AuditUpdate('User', 'User consents updated')
   async updateConsents(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() consents: ConsentUpdateDto,
   ) {
     return this.gdprService.updateConsents(userId, consents);
@@ -116,7 +116,7 @@ export class GdprController {
     status: 200,
     description: 'Consent status retrieved successfully',
   })
-  async getConsentStatus(@GetUser('sub') userId: number) {
+  async getConsentStatus(@GetUser('id') userId: number) {
     return this.gdprService.getConsentStatus(userId);
   }
 
@@ -131,7 +131,7 @@ export class GdprController {
     description: 'Policies accepted successfully',
   })
   @AuditUpdate('User', 'Privacy policy and terms accepted')
-  async acceptPolicies(@GetUser('sub') userId: number) {
+  async acceptPolicies(@GetUser('id') userId: number) {
     return this.gdprService.acceptPolicies(userId);
   }
 }

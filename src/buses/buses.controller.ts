@@ -95,7 +95,7 @@ export class BusesController {
   @ApiResponse({ status: 404, description: 'Bus schedule not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized - JWT token required' })
   async bookBus(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() dto: BookBusDto,
   ): Promise<{
     busBookingId: number;
@@ -124,7 +124,7 @@ export class BusesController {
     description: 'Forbidden - you do not have access to this booking',
   })
   async getBusBooking(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<any> {
     return this.busesService.getBusBooking(id, userId);
@@ -150,7 +150,7 @@ export class BusesController {
   })
   @ApiResponse({ status: 404, description: 'Bus booking not found' })
   async cancelBusBooking(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<void> {
     return this.busesService.cancelBusBooking(id, userId);

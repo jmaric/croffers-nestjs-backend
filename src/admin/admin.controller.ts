@@ -40,6 +40,16 @@ export class AdminController {
   // PLATFORM ANALYTICS
   // ============================================
 
+  @Get('stats')
+  @ApiOperation({
+    summary: 'Get platform statistics',
+    description: 'Returns platform statistics for admin dashboard.',
+  })
+  @ApiResponse({ status: 200, description: 'Platform statistics retrieved' })
+  getPlatformStats() {
+    return this.adminService.getPlatformStats();
+  }
+
   @Get('analytics/dashboard')
   @ApiOperation({
     summary: 'Get platform dashboard analytics',
@@ -128,6 +138,27 @@ export class AdminController {
     return this.adminService.getTrustScoreAnalytics();
   }
 
+  @Get('analytics/charts')
+  @ApiOperation({
+    summary: 'Get chart analytics data',
+    description:
+      'Returns revenue, bookings, and user growth data for the last 6 months.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Chart analytics retrieved',
+    schema: {
+      example: [
+        { month: 'Jul', revenue: 12000, bookings: 45, users: 650, suppliers: 32 },
+        { month: 'Aug', revenue: 15000, bookings: 52, users: 720, suppliers: 38 },
+        { month: 'Sep', revenue: 18000, bookings: 61, users: 800, suppliers: 42 },
+      ],
+    },
+  })
+  getChartAnalytics() {
+    return this.adminService.getChartAnalytics();
+  }
+
   // ============================================
   // SUPPLIER MANAGEMENT
   // ============================================
@@ -140,6 +171,75 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'Pending suppliers retrieved' })
   getPendingSuppliers() {
     return this.adminService.getPendingSuppliers();
+  }
+
+  // ============================================
+  // SERVICE MANAGEMENT
+  // ============================================
+
+  @Get('services/pending')
+  @ApiOperation({
+    summary: 'Get pending services',
+    description: 'Returns list of services awaiting approval.',
+  })
+  @ApiResponse({ status: 200, description: 'Pending services retrieved' })
+  getPendingServices() {
+    return this.adminService.getPendingServices();
+  }
+
+  @Get('services')
+  @ApiOperation({
+    summary: 'Get all services with optional status filter',
+    description: 'Returns list of all services, optionally filtered by status (DRAFT, APPROVED, REJECTED).',
+  })
+  @ApiResponse({ status: 200, description: 'Services retrieved successfully' })
+  getAllServices(@Query('status') status?: string) {
+    return this.adminService.getAllServices(status);
+  }
+
+  @Post('services/:id/approve')
+  @ApiOperation({
+    summary: 'Approve service',
+    description: 'Approves a service, making it active on the platform.',
+  })
+  @ApiParam({ name: 'id', description: 'Service ID', example: 1 })
+  @ApiResponse({ status: 200, description: 'Service approved successfully' })
+  @ApiResponse({ status: 404, description: 'Service not found' })
+  approveService(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.approveService(id);
+  }
+
+  @Post('services/:id/reject')
+  @ApiOperation({
+    summary: 'Reject service',
+    description: 'Rejects a service with reason.',
+  })
+  @ApiParam({ name: 'id', description: 'Service ID', example: 1 })
+  @ApiResponse({ status: 200, description: 'Service rejected successfully' })
+  @ApiResponse({ status: 404, description: 'Service not found' })
+  rejectService(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { reason: string },
+  ) {
+    return this.adminService.rejectService(id, body.reason);
+  }
+
+  // ============================================
+  // BOOKING MANAGEMENT
+  // ============================================
+
+  @Get('bookings')
+  @ApiOperation({
+    summary: 'Get all bookings with pagination',
+    description: 'Returns paginated list of all bookings.',
+  })
+  @ApiResponse({ status: 200, description: 'Bookings retrieved successfully' })
+  getAllBookings(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getAllBookings(+page, +limit, status);
   }
 
   @Patch('suppliers/:id/approve')
@@ -279,6 +379,20 @@ export class AdminController {
   // ============================================
   // USER MANAGEMENT
   // ============================================
+
+  @Get('users')
+  @ApiOperation({
+    summary: 'Get all users with pagination',
+    description: 'Returns paginated list of all users.',
+  })
+  @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
+  getAllUsers(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getAllUsers(+page, +limit, status);
+  }
 
   @Get('users/overview')
   @ApiOperation({

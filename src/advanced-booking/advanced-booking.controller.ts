@@ -71,7 +71,7 @@ export class AdvancedBookingController {
     description: 'Group booking created successfully',
   })
   async createGroupBooking(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() bookingDto: dto.CreateGroupBookingDto,
   ) {
     return this.groupBookingService.createGroupBooking(bookingDto, userId);
@@ -88,7 +88,7 @@ export class AdvancedBookingController {
     status: 200,
     description: 'Group bookings retrieved successfully',
   })
-  async getUserGroupBookings(@GetUser('sub') userId: number) {
+  async getUserGroupBookings(@GetUser('id') userId: number) {
     return this.groupBookingService.getUserGroupBookings(userId);
   }
 
@@ -110,7 +110,7 @@ export class AdvancedBookingController {
     type: dto.PackageResponseDto,
   })
   async createPackage(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() packageDto: dto.CreatePackageDto,
   ) {
     return this.packageService.createPackage(packageDto, userId);
@@ -174,7 +174,7 @@ export class AdvancedBookingController {
     description: 'Package booked successfully',
   })
   async bookPackage(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() bookDto: dto.BookPackageDto,
   ) {
     return this.packageService.bookPackage(bookDto, userId);
@@ -193,7 +193,7 @@ export class AdvancedBookingController {
     description: 'Package updated successfully',
   })
   async updatePackage(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: Partial<dto.CreatePackageDto>,
   ) {
@@ -214,7 +214,7 @@ export class AdvancedBookingController {
     description: 'Package deleted successfully',
   })
   async deletePackage(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.packageService.deletePackage(id, userId);
@@ -237,7 +237,7 @@ export class AdvancedBookingController {
     description: 'Price alert created successfully',
   })
   async createPriceAlert(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() alertDto: dto.CreatePriceAlertDto,
   ) {
     return this.priceAlertService.createPriceAlert(alertDto, userId);
@@ -254,7 +254,7 @@ export class AdvancedBookingController {
     status: 200,
     description: 'Price alerts retrieved successfully',
   })
-  async getUserAlerts(@GetUser('sub') userId: number) {
+  async getUserAlerts(@GetUser('id') userId: number) {
     return this.priceAlertService.getUserAlerts(userId);
   }
 
@@ -272,7 +272,7 @@ export class AdvancedBookingController {
     description: 'Price alert deleted successfully',
   })
   async deleteAlert(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.priceAlertService.deleteAlert(id, userId);
@@ -310,7 +310,7 @@ export class AdvancedBookingController {
     description: 'Modification request created',
   })
   async modifyDate(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() modifyDto: dto.ModifyBookingDateDto,
   ) {
     return this.bookingModificationService.modifyDate(modifyDto, userId);
@@ -328,7 +328,7 @@ export class AdvancedBookingController {
     description: 'Modification request created',
   })
   async modifyGuestCount(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() modifyDto: dto.ModifyBookingGuestsDto,
   ) {
     return this.bookingModificationService.modifyGuestCount(modifyDto, userId);
@@ -346,7 +346,7 @@ export class AdvancedBookingController {
     description: 'Upgrade request created',
   })
   async upgradeService(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() upgradeDto: dto.UpgradeServiceDto,
   ) {
     return this.bookingModificationService.upgradeService(upgradeDto, userId);
@@ -364,7 +364,7 @@ export class AdvancedBookingController {
     description: 'Services added successfully',
   })
   async addServices(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() addDto: dto.AddServiceToBookingDto,
   ) {
     return this.bookingModificationService.addServices(addDto, userId);
@@ -382,7 +382,7 @@ export class AdvancedBookingController {
     description: 'Service removed successfully',
   })
   async removeService(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() removeDto: dto.RemoveServiceFromBookingDto,
   ) {
     return this.bookingModificationService.removeService(removeDto, userId);
@@ -401,7 +401,7 @@ export class AdvancedBookingController {
     description: 'Modifications retrieved successfully',
   })
   async getBookingModifications(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('bookingId', ParseIntPipe) bookingId: number,
   ) {
     return this.bookingModificationService.getBookingModifications(bookingId, userId);

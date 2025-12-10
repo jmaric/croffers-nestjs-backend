@@ -180,6 +180,22 @@ export class MailService {
     });
   }
 
+  async sendNewMessageNotification(conversation: any, message: any, recipient: any) {
+    if (!this.transporter) return;
+
+    const html = this.getNewMessageTemplate(conversation, message, recipient);
+
+    const senderName = message.sender?.firstName
+      ? `${message.sender.firstName} ${message.sender.lastName || ''}`.trim()
+      : message.sender?.email || 'Someone';
+
+    await this.sendMail({
+      to: recipient.email,
+      subject: `New Message from ${senderName}`,
+      html,
+    });
+  }
+
   private async sendMail(options: {
     to: string;
     subject: string;
@@ -455,6 +471,49 @@ export class MailService {
             <p>Unfortunately, we are unable to approve your application at this time.</p>
 
             <p><strong>Reason:</strong> ${reason}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getNewMessageTemplate(conversation: any, message: any, recipient: any): string {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const senderName = message.sender?.firstName
+      ? `${message.sender.firstName} ${message.sender.lastName || ''}`.trim()
+      : message.sender?.email || 'Someone';
+
+    const bookingInfo = conversation.booking
+      ? `<p><strong>Regarding Booking:</strong> ${conversation.booking.bookingReference}</p>`
+      : '';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family: Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #2196F3; color: white; padding: 20px; text-align: center;">
+            <h1>New Message Received</h1>
+          </div>
+          <div style="padding: 20px; background-color: #f9f9f9;">
+            <p>Hello ${recipient.firstName || recipient.email},</p>
+            <p>You have received a new message from ${senderName}.</p>
+
+            ${bookingInfo}
+
+            <div style="background-color: white; padding: 15px; margin: 20px 0; border-left: 4px solid #2196F3;">
+              <p style="margin: 0;">${message.content}</p>
+            </div>
+
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${frontendUrl}/messages/${conversation.id}" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 4px;">View Conversation</a>
+            </p>
+
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">
+              You're receiving this email because you have a conversation on Croffers Nest.
+              To manage your notification preferences, visit your account settings.
+            </p>
           </div>
         </div>
       </body>

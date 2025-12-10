@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { I18nModule, AcceptLanguageResolver, QueryResolver, HeaderResolver } from 'nestjs-i18n';
 import { WinstonModule } from 'nest-winston';
@@ -41,6 +42,8 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 import { SupplierPremiumModule } from './supplier-premium/supplier-premium.module.js';
 import { SocialModule } from './social/social.module.js';
 import { AiModule } from './ai/ai.module.js';
+import { TransportModule } from './transport/transport.module.js';
+import { DisputesModule } from './disputes/disputes.module.js';
 
 @Module({
   imports: [
@@ -48,6 +51,7 @@ import { AiModule } from './ai/ai.module.js';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    NestScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'short',
@@ -111,6 +115,8 @@ import { AiModule } from './ai/ai.module.js';
     SupplierPremiumModule,
     SocialModule,
     AiModule,
+    TransportModule,
+    DisputesModule,
   ],
   controllers: [AppController],
   providers: [

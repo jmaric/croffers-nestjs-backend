@@ -61,9 +61,15 @@ export class SupplierAnalyticsService {
       upcomingBookings,
       pendingBookings,
     ] = await Promise.all([
-      this.prisma.booking.count({ where: { supplierId } }),
       this.prisma.booking.count({
-        where: { supplierId, createdAt: { gte: last30Days } },
+        where: { supplierId, status: { not: BookingStatus.CANCELLED } },
+      }),
+      this.prisma.booking.count({
+        where: {
+          supplierId,
+          createdAt: { gte: last30Days },
+          status: { not: BookingStatus.CANCELLED },
+        },
       }),
       this.prisma.booking.count({
         where: {
@@ -293,6 +299,13 @@ export class SupplierAnalyticsService {
           }, 0) / confirmedBookings.length
         : 0;
 
+    // Daily bookings trend
+    const dailyBookings = await this.getDailyBookings(
+      supplierId,
+      startDate,
+      endDate,
+    );
+
     return {
       period: { startDate, endDate },
       totalBookings,
@@ -300,6 +313,7 @@ export class SupplierAnalyticsService {
       cancellationRate: Math.round(cancellationRate * 100) / 100,
       serviceTypeBreakdown,
       avgLeadTimeDays: Math.round(avgLeadTime * 10) / 10,
+      dailyBookings,
     };
   }
 
@@ -635,6 +649,35 @@ export class SupplierAnalyticsService {
         return acc;
       },
       {} as Record<string, { date: string; revenue: number; bookings: number }>,
+    );
+
+    return Object.values(dailyData);
+  }
+
+  private async getDailyBookings(
+    supplierId: number,
+    startDate: Date,
+    endDate: Date,
+  ) {
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        supplierId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      select: { createdAt: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const dailyData = bookings.reduce(
+      (acc, booking) => {
+        const date = booking.createdAt.toISOString().split('T')[0];
+        if (!acc[date]) {
+          acc[date] = { date, count: 0 };
+        }
+        acc[date].count += 1;
+        return acc;
+      },
+      {} as Record<string, { date: string; count: number }>,
     );
 
     return Object.values(dailyData);

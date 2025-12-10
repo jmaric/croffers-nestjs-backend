@@ -161,7 +161,7 @@ export class FerriesController {
     description: 'Unauthorized - JWT token required',
   })
   async bookFerry(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Body() dto: BookFerryDto,
   ): Promise<{
     ferryBookingId: number;
@@ -197,7 +197,7 @@ export class FerriesController {
     description: 'Forbidden - you do not have access to this booking',
   })
   async getFerryBooking(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<any> {
     return this.ferriesService.getFerryBooking(id, userId);
@@ -230,7 +230,7 @@ export class FerriesController {
     description: 'Ferry booking not found',
   })
   async cancelFerryBooking(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<void> {
     return this.ferriesService.cancelFerryBooking(id, userId);

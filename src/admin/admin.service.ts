@@ -12,6 +12,7 @@ import {
   UserStatus,
   SupplierStatus,
   BookingStatus,
+  ServiceStatus,
 } from '../../generated/prisma/client/client.js';
 
 @Injectable()
@@ -158,6 +159,209 @@ export class AdminService {
         active: activeServices,
         inactive: inactiveServices,
       },
+    };
+  }
+
+  async getPlatformStats() {
+    const [totalUsers, totalServices, totalBookings, totalRevenue, activeSuppliers, pendingServices] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.service.count({ where: { isActive: true } }),
+      this.prisma.booking.count(),
+      this.prisma.booking.aggregate({
+        where: { status: { in: [BookingStatus.COMPLETED, BookingStatus.CONFIRMED] } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.supplier.count({ where: { status: SupplierStatus.APPROVED } }),
+      this.prisma.service.count({ where: { status: 'DRAFT' } }),
+    ]);
+
+    // Calculate recommendation rate from reviews
+    const [totalReviews, recommendedReviews] = await Promise.all([
+      this.prisma.review.count(),
+      this.prisma.review.count({ where: { wouldRecommend: true } }),
+    ]);
+
+    const recommendationRate = totalReviews > 0
+      ? Math.round((recommendedReviews / totalReviews) * 100)
+      : 0;
+
+    // Calculate growth rate (simplified - compare current month to last month users)
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const [currentMonthUsers, lastMonthUsers] = await Promise.all([
+      this.prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
+      this.prisma.user.count({
+        where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } },
+      }),
+    ]);
+
+    const growthRate = lastMonthUsers > 0
+      ? Math.round(((currentMonthUsers - lastMonthUsers) / lastMonthUsers) * 100)
+      : 0;
+
+    return {
+      totalUsers,
+      activeSuppliers,
+      totalServices,
+      pendingServices,
+      totalBookings,
+      revenue: Number(totalRevenue._sum.totalAmount || 0),
+      growthRate,
+      recommendationRate,
+    };
+  }
+
+  async getAllUsers(page: number = 1, limit: number = 20, status?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          _count: {
+            select: {
+              bookings: true,
+            },
+          },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data: users.map(user => ({
+        ...user,
+        bookings: user._count.bookings,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getPendingServices() {
+    const services = await this.prisma.service.findMany({
+      where: { status: 'DRAFT' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        supplier: {
+          select: {
+            businessName: true,
+          },
+        },
+      },
+    });
+
+    return services;
+  }
+
+  async getAllServices(status?: string) {
+    const where: any = {};
+
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    const services = await this.prisma.service.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            businessName: true,
+          },
+        },
+      },
+    });
+
+    return services;
+  }
+
+  async getAllBookings(page: number = 1, limit: number = 20, status?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    const [bookings, total] = await Promise.all([
+      this.prisma.booking.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          bookingItems: {
+            include: {
+              service: {
+                select: {
+                  name: true,
+                  supplier: {
+                    select: {
+                      businessName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.booking.count({ where }),
+    ]);
+
+    // Transform bookings to match frontend expectations
+    const transformedBookings = bookings.map(booking => {
+      const firstItem = booking.bookingItems[0];
+      const guestName = `${booking.user.firstName} ${booking.user.lastName}`;
+      const supplierName = firstItem?.service?.supplier?.businessName || 'N/A';
+      const serviceName = firstItem?.service?.name || 'N/A';
+
+      return {
+        id: booking.id,
+        guest: guestName,
+        supplier: supplierName,
+        service: serviceName,
+        amount: Number(booking.totalAmount || 0),
+        status: booking.status,
+        date: booking.serviceDate.toISOString().split('T')[0],
+      };
+    });
+
+    return {
+      data: transformedBookings,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -433,6 +637,49 @@ export class AdminService {
             email: true,
             firstName: true,
             lastName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async approveService(id: number) {
+    const service = await this.prisma.service.findUnique({ where: { id } });
+    if (!service) {
+      throw new NotFoundException(`Service with ID ${id} not found`);
+    }
+
+    return this.prisma.service.update({
+      where: { id },
+      data: { status: ServiceStatus.ACTIVE },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            businessName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async rejectService(id: number, reason: string) {
+    const service = await this.prisma.service.findUnique({ where: { id } });
+    if (!service) {
+      throw new NotFoundException(`Service with ID ${id} not found`);
+    }
+
+    return this.prisma.service.update({
+      where: { id },
+      data: {
+        status: ServiceStatus.INACTIVE,
+        // Store rejection reason in metadata or create a separate table if needed
+      },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            businessName: true,
           },
         },
       },
@@ -836,5 +1083,116 @@ export class AdminService {
 
     const positiveReviews = reviews.filter((r) => r.wouldRecommend).length;
     return Math.round((positiveReviews / reviews.length) * 100);
+  }
+
+  // Get real revenue and user growth data for charts
+  async getChartAnalytics() {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    // Get all bookings from last 6 months
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        createdAt: { gte: sixMonthsAgo },
+        status: { in: [BookingStatus.COMPLETED, BookingStatus.CONFIRMED] },
+      },
+      select: {
+        createdAt: true,
+        totalAmount: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Get all users from last 6 months
+    const users = await this.prisma.user.findMany({
+      where: {
+        createdAt: { gte: sixMonthsAgo },
+      },
+      select: {
+        createdAt: true,
+        role: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Group by month
+    const monthlyData: Record<string, {
+      month: string;
+      revenue: number;
+      bookings: number;
+      users: number;
+      suppliers: number;
+    }> = {};
+
+    // Initialize last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('en-US', { month: 'short' });
+
+      monthlyData[monthKey] = {
+        month: monthLabel,
+        revenue: 0,
+        bookings: 0,
+        users: 0,
+        suppliers: 0,
+      };
+    }
+
+    // Aggregate bookings by month
+    bookings.forEach((booking) => {
+      const monthKey = `${booking.createdAt.getFullYear()}-${String(booking.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyData[monthKey]) {
+        monthlyData[monthKey].revenue += Number(booking.totalAmount);
+        monthlyData[monthKey].bookings += 1;
+      }
+    });
+
+    // Aggregate users by month (cumulative)
+    const userCounts = { total: 0, suppliers: 0 };
+    users.forEach((user) => {
+      const monthKey = `${user.createdAt.getFullYear()}-${String(user.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyData[monthKey]) {
+        userCounts.total += 1;
+        monthlyData[monthKey].users = userCounts.total;
+
+        if (user.role === 'SUPPLIER') {
+          userCounts.suppliers += 1;
+        }
+        monthlyData[monthKey].suppliers = userCounts.suppliers;
+      }
+    });
+
+    // Get total counts for cumulative calculation
+    const [totalUsersBefore, totalSuppliersBefore] = await Promise.all([
+      this.prisma.user.count({
+        where: { createdAt: { lt: sixMonthsAgo } },
+      }),
+      this.prisma.user.count({
+        where: {
+          createdAt: { lt: sixMonthsAgo },
+          role: 'SUPPLIER',
+        },
+      }),
+    ]);
+
+    // Apply baseline to make cumulative
+    let cumulativeUsers = totalUsersBefore;
+    let cumulativeSuppliers = totalSuppliersBefore;
+
+    const chartData = Object.values(monthlyData).map((data) => {
+      cumulativeUsers += data.users;
+      cumulativeSuppliers += data.suppliers;
+
+      return {
+        month: data.month,
+        revenue: Math.round(data.revenue),
+        bookings: data.bookings,
+        users: cumulativeUsers,
+        suppliers: cumulativeSuppliers,
+      };
+    });
+
+    return chartData;
   }
 }

@@ -120,6 +120,24 @@ export class FilterServiceDto {
   @Type(() => Number)
   radius?: number;
 
+  // Location filters
+  @ApiPropertyOptional({
+    description: 'Filter by location ID',
+    example: 1,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  locationId?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by location name or slug (case-insensitive)',
+    example: 'dubrovnik',
+  })
+  @IsString()
+  @IsOptional()
+  locationName?: string;
+
   // Capacity filter
   @ApiPropertyOptional({
     description: 'Minimum capacity (guests)',

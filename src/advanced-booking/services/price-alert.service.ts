@@ -33,6 +33,11 @@ export class PriceAlertService {
   async createPriceAlert(dto: CreatePriceAlertDto, userId: number) {
     this.logger.log(`Creating price alert for user ${userId}, service ${dto.serviceId}`);
 
+    // Validate userId
+    if (!userId || typeof userId !== 'number') {
+      throw new BadRequestException('User authentication required');
+    }
+
     // Check subscription limits
     const isPremium = await this.subscriptionService.isPremium(userId);
 

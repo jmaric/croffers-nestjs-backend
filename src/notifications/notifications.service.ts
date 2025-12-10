@@ -28,6 +28,8 @@ export class NotificationsService {
   // ============================================
 
   async create(dto: CreateNotificationDto) {
+    console.log('🔔 [NotificationsService] Creating notification for user:', dto.userId, 'Type:', dto.type);
+
     const notification = await this.prisma.notification.create({
       data: {
         userId: dto.userId,
@@ -49,13 +51,17 @@ export class NotificationsService {
       },
     });
 
+    console.log('✅ [NotificationsService] Notification created in DB:', notification.id);
+
     // Send real-time notification via WebSocket
+    console.log('📡 [NotificationsService] Sending WebSocket notification to user:', dto.userId);
     this.gateway.sendNotificationToUser(dto.userId, notification);
 
     // Update unread count
     const unreadCount = await this.prisma.notification.count({
       where: { userId: dto.userId, isRead: false },
     });
+    console.log('📊 [NotificationsService] Unread count for user', dto.userId, ':', unreadCount);
     this.gateway.sendUnreadCountUpdate(dto.userId, unreadCount);
 
     // Send email notification for important types
@@ -280,7 +286,7 @@ export class NotificationsService {
       type: NotificationType.BOOKING_CONFIRMATION,
       title: 'New Booking Received',
       message: `New booking ${bookingReference} for ${amount} EUR received!`,
-      actionUrl: `/supplier/bookings/${bookingId}`,
+      actionUrl: `/bookings/${bookingId}`,
       metadata: { bookingId, bookingReference, amount },
     });
   }
@@ -326,6 +332,41 @@ export class NotificationsService {
       actionUrl: `/reviews/${reviewId}`,
       metadata: { reviewId, supplierName, wouldRecommend },
     });
+  }
+
+  // Notify all admins about pending approvals
+  async notifyAllAdmins(
+    type: NotificationType,
+    title: string,
+    message: string,
+    actionUrl?: string,
+    metadata?: any,
+  ) {
+    console.log('🔔 [NotificationsService] Notifying all admins:', title);
+
+    // Find all admin users
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true },
+    });
+
+    console.log(`✅ [NotificationsService] Found ${admins.length} admins to notify`);
+
+    // Create notifications for each admin
+    const notifications = await Promise.all(
+      admins.map((admin) =>
+        this.create({
+          userId: admin.id,
+          type,
+          title,
+          message,
+          actionUrl,
+          metadata,
+        }),
+      ),
+    );
+
+    return notifications;
   }
 
   // ============================================

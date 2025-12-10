@@ -2,8 +2,6 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CrowdIndexCalculatorService } from './crowd-index-calculator.service.js';
 import { GooglePopularTimesService } from './google-popular-times.service.js';
-import { InstagramApiService } from './instagram-api.service.js';
-import { TikTokApiService } from './tiktok-api.service.js';
 import { WeatherApiService } from './weather-api.service.js';
 import {
   CrowdDataResponseDto,
@@ -21,8 +19,6 @@ export class CrowdIntelligenceService {
     private readonly prisma: PrismaService,
     private readonly crowdCalculator: CrowdIndexCalculatorService,
     private readonly googleService: GooglePopularTimesService,
-    private readonly instagramService: InstagramApiService,
-    private readonly tiktokService: TikTokApiService,
     private readonly weatherService: WeatherApiService,
   ) {}
 
@@ -78,30 +74,25 @@ export class CrowdIntelligenceService {
     }
 
     // Fetch data from all sources in parallel
-    const [googleData, instagramData, tiktokData, weatherData, eventData, sensorData] =
-      await Promise.all([
-        this.googleService.fetchPopularTimes(
-          location.slug,
-          location.latitude,
-          location.longitude,
-        ),
-        this.fetchInstagramData(location),
-        this.fetchTikTokData(location),
-        this.weatherService.fetchWeather(
-          location.latitude,
-          location.longitude,
-          location.type,
-        ),
-        this.fetchEventData(locationId),
-        this.fetchSensorData(locationId),
-      ]);
+    const [googleData, weatherData, eventData, sensorData] = await Promise.all([
+      this.googleService.fetchPopularTimes(
+        location.name,
+        location.latitude,
+        location.longitude,
+      ),
+      this.weatherService.fetchWeather(
+        location.latitude,
+        location.longitude,
+        location.type,
+      ),
+      this.fetchEventData(locationId),
+      this.fetchSensorData(locationId),
+    ]);
 
     // Calculate crowd index
     const crowdResult = this.crowdCalculator.calculateCrowdIndex({
       googleLiveScore: googleData.liveScore,
       googleHistoricScore: googleData.historicScore,
-      instagramScore: instagramData.score,
-      tiktokScore: tiktokData.score,
       weatherScore: weatherData.score,
       eventScore: eventData.score,
       sensorScore: sensorData.score,
@@ -116,8 +107,8 @@ export class CrowdIntelligenceService {
         crowdLevel: crowdResult.crowdLevel,
         googleLiveScore: googleData.liveScore,
         googleHistoricScore: googleData.historicScore,
-        instagramScore: instagramData.score,
-        tiktokScore: tiktokData.score,
+        instagramScore: null,
+        tiktokScore: null,
         weatherScore: weatherData.score,
         eventScore: eventData.score,
         sensorScore: sensorData.score,
@@ -128,9 +119,6 @@ export class CrowdIntelligenceService {
         isPrediction: false,
       },
     });
-
-    // Store social trends
-    await this.storeSocialTrends(locationId, instagramData, tiktokData);
 
     // Store weather snapshot
     await this.storeWeatherSnapshot(locationId, weatherData);
@@ -147,12 +135,13 @@ export class CrowdIntelligenceService {
   ): Promise<HeatmapResponseDto> {
     this.logger.debug(`Generating heatmap for ${locationIds?.length || 'all'} locations`);
 
-    // Get locations
+    // Get locations - only child locations (POIs) for crowd intelligence
     const locations = await this.prisma.location.findMany({
       where: {
         ...(locationIds && { id: { in: locationIds } }),
         ...(locationType && { type: locationType as any }),
         isActive: true,
+        parentId: { not: null }, // Only POIs (child locations), not service locations
       },
       include: {
         crowdData: {
@@ -198,12 +187,16 @@ export class CrowdIntelligenceService {
   async updateAllCrowdData() {
     this.logger.log('Running scheduled crowd data update');
 
+    // Only update crowd data for child locations (POIs, not service locations)
     const activeLocations = await this.prisma.location.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        parentId: { not: null }, // Only child locations (attractions, beaches, etc.)
+      },
       select: { id: true, name: true },
     });
 
-    this.logger.log(`Updating crowd data for ${activeLocations.length} locations`);
+    this.logger.log(`Updating crowd data for ${activeLocations.length} POI locations`);
 
     for (const location of activeLocations) {
       try {
@@ -218,31 +211,6 @@ export class CrowdIntelligenceService {
     this.logger.log('Crowd data update completed');
   }
 
-  /**
-   * Helper: Fetch Instagram data
-   */
-  private async fetchInstagramData(location: any) {
-    const hashtags = this.instagramService.getSuggestedHashtags(location.name, location.type);
-    return this.instagramService.fetchLocationTrends(
-      location.name,
-      location.latitude,
-      location.longitude,
-      hashtags,
-    );
-  }
-
-  /**
-   * Helper: Fetch TikTok data
-   */
-  private async fetchTikTokData(location: any) {
-    const hashtags = this.tiktokService.getSuggestedHashtags(location.name, location.type);
-    return this.tiktokService.fetchLocationTrends(
-      location.name,
-      location.latitude,
-      location.longitude,
-      hashtags,
-    );
-  }
 
   /**
    * Helper: Fetch event data
@@ -310,42 +278,6 @@ export class CrowdIntelligenceService {
     };
   }
 
-  /**
-   * Helper: Store social trends
-   */
-  private async storeSocialTrends(locationId: number, instagramData: any, tiktokData: any) {
-    const now = new Date();
-    const hourOfDay = now.getHours();
-    const dayOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][now.getDay()];
-
-    await Promise.all([
-      this.prisma.socialTrend.create({
-        data: {
-          locationId,
-          platform: 'instagram',
-          postCount: instagramData.postCount,
-          storyCount: instagramData.storyCount,
-          hashtagVelocity: instagramData.hashtagVelocity,
-          engagement: instagramData.engagement,
-          hashtags: instagramData.hashtags,
-          hourOfDay,
-          dayOfWeek,
-        },
-      }),
-      this.prisma.socialTrend.create({
-        data: {
-          locationId,
-          platform: 'tiktok',
-          postCount: tiktokData.videoCount,
-          hashtagVelocity: tiktokData.hashtagVelocity,
-          engagement: tiktokData.engagement,
-          hashtags: tiktokData.hashtags,
-          hourOfDay,
-          dayOfWeek,
-        },
-      }),
-    ]);
-  }
 
   /**
    * Helper: Store weather snapshot
@@ -376,8 +308,6 @@ export class CrowdIntelligenceService {
     const dataSourceScores: DataSourceScores = {
       googleLive: crowdDataPoint.googleLiveScore,
       googleHistoric: crowdDataPoint.googleHistoricScore,
-      instagram: crowdDataPoint.instagramScore,
-      tiktok: crowdDataPoint.tiktokScore,
       weather: crowdDataPoint.weatherScore,
       event: crowdDataPoint.eventScore,
       sensor: crowdDataPoint.sensorScore,

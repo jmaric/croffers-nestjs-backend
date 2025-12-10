@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma/client"
@@ -10,9 +7,1553 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================
-// USER MANAGEMENT
-// ============================================
+model User {
+  id                      Int                     @id @default(autoincrement())
+  email                   String                  @unique
+  firstName               String?
+  lastName                String?
+  hash                    String
+  role                    UserRole                @default(TOURIST)
+  status                  UserStatus              @default(INACTIVE)
+  phone                   String?
+  avatar                  String?
+  emailVerified           Boolean                 @default(false)
+  emailVerificationToken  String?
+  verificationTokenExpiry DateTime?
+  resetToken              String?
+  resetTokenExpiry        DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  dataProcessingConsent   Boolean                 @default(false)
+  dataProcessingConsentAt DateTime?
+  deletionRequestedAt     DateTime?
+  marketingConsent        Boolean                 @default(false)
+  marketingConsentAt      DateTime?
+  privacyPolicyAccepted   Boolean                 @default(false)
+  privacyPolicyAcceptedAt DateTime?
+  scheduledDeletionAt     DateTime?
+  termsAccepted           Boolean                 @default(false)
+  termsAcceptedAt         DateTime?
+  cancelAtPeriodEnd       Boolean                 @default(false)
+  stripeCustomerId        String?                 @unique
+  stripeSubscriptionId    String?                 @unique
+  subscriptionEndDate     DateTime?
+  subscriptionStartDate   DateTime?
+  subscriptionStatus      String?
+  subscriptionTier        String?                 @default("FREE")
+  trialEndsAt             DateTime?
+  auditLogs               AuditLog[]
+  bookings                Booking[]
+  chatConversations       ChatConversation[]
+  guestConversations      Conversation[]          @relation("GuestConversations")
+  supplierConversations   Conversation[]          @relation("SupplierConversations")
+  conversationAccessLogs  ConversationAccessLog[] @relation("ConversationAccessLog")
+  disputesInitiated       Dispute[]               @relation("DisputeInitiator")
+  disputesReceived        Dispute[]               @relation("DisputeRespondent")
+  disputesAssigned        Dispute[]               @relation("DisputeAssignedAdmin")
+  crowdAlerts             CrowdAlert[]
+  favorites               Favorite[]
+  friendOf                Friendship[]            @relation("FriendFriendships")
+  friendships             Friendship[]            @relation("UserFriendships")
+  itineraryComments       ItineraryComment[]
+  itineraryLikes          ItineraryLike[]
+  journeys                Journey[]
+  messages                Message[]
+  notifications           Notification[]
+  priceAlerts             PriceAlert[]
+  recommendationScores    RecommendationScore[]
+  reviews                 Review[]
+  sharedItineraries       SharedItinerary[]       @relation("SharedItineraryOwner")
+  smartSuggestions        SmartSuggestion[]
+  storyComments           StoryComment[]
+  storyLikes              StoryLike[]
+  subscriptionEvents      SubscriptionEvent[]
+  suppliers               Supplier[]
+  travelStories           TravelStory[]
+  itineraries             TripItinerary[]
+  activities              UserActivity[]
+  interactions            UserInteraction[]
+  preferences             UserPreferences?
+  profile                 UserProfile?
+
+  @@map("users")
+}
+
+model UserProfile {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  preferences      Json?
+  emergencyContact String?
+  nationality      String?
+  passportNumber   String?
+  loyaltyPoints    Int      @default(0)
+  totalSpent       Decimal  @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model Location {
+  id                  Int                    @id @default(autoincrement())
+  name                String
+  slug                String                 @unique
+  type                LocationType
+  description         String?
+  latitude            Float
+  longitude           Float
+  address             String?
+  parentId            Int?
+  isActive            Boolean                @default(true)
+  metadata            Json?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  translations        Json?
+  crowdCapacity       Int?
+  accommodations      AccommodationService[]
+  activities          ActivityService[]
+  busArrivals         BusSchedule[]          @relation("BusArrival")
+  busDepartures       BusSchedule[]          @relation("BusDeparture")
+  businessProfiles    BusinessProfile[]
+  crowdAlerts         CrowdAlert[]
+  crowdData           CrowdDataPoint[]
+  crowdPredictions    CrowdPrediction[]
+  densityReadings     DensityReading[]
+  events              Event[]
+  ferryArrivals       FerrySchedule[]        @relation("FerryArrival")
+  ferryDepartures     FerrySchedule[]        @relation("FerryDeparture")
+  segmentArrivals     JourneySegment[]       @relation("SegmentArrival")
+  segmentDepartures   JourneySegment[]       @relation("SegmentDeparture")
+  journeyDestinations Journey[]              @relation("JourneyDestination")
+  journeyOrigins      Journey[]              @relation("JourneyOrigin")
+  parent              Location?              @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children            Location[]             @relation("LocationHierarchy")
+  photos              Photo[]
+  sensors             Sensor[]
+  socialTrends        SocialTrend[]
+  tours               TourService[]
+  transportArrivals   TransportService[]     @relation("ArrivalLocation")
+  transportDepartures TransportService[]     @relation("DepartureLocation")
+  travelStories       TravelStory[]
+  weatherSnapshots    WeatherSnapshot[]
+
+  @@index([latitude, longitude])
+  @@index([type])
+  @@index([isActive])
+  @@map("locations")
+}
+
+model Supplier {
+  id                 Int                     @id @default(autoincrement())
+  userId             Int
+  businessName       String
+  registrationNum    String?
+  vatNumber          String?
+  status             SupplierStatus          @default(PENDING)
+  commissionRate     Float                   @default(0.15)
+  subscriptionTier   String?
+  subscriptionExpiry DateTime?
+  bankAccount        String?
+  payoutSchedule     String?                 @default("weekly")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  bookings           Booking[]
+  businessProfile    BusinessProfile?
+  commissions        Commission[]
+  promotedListings   PromotedListing[]
+  reviews            Review[]                @relation("SupplierReviews")
+  packages           ServicePackage[]
+  services           Service[]
+  addons             SupplierAddon[]
+  apiKeys            SupplierApiKey[]
+  supportTickets     SupplierSupportTicket[]
+  user               User                    @relation(fields: [userId], references: [id])
+
+  @@map("suppliers")
+}
+
+model Service {
+  id                   Int                   @id @default(autoincrement())
+  supplierId           Int
+  type                 ServiceType
+  name                 String
+  slug                 String                @unique
+  description          String?
+  shortDescription     String?
+  price                Decimal
+  pricePerGroup        Decimal? // Optional: for tours/activities that can be booked per group
+  currency             String                @default("EUR")
+  capacity             Int?
+  duration             Int?
+  isActive             Boolean               @default(true)
+  status               ServiceStatus         @default(DRAFT)
+  tags                 String[]              @default([])
+  metadata             Json?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  translations         Json?
+  accommodationService AccommodationService?
+  activityService      ActivityService?
+  bookingItems         BookingItem[]
+  dynamicPricing       DynamicPricing[]
+  favorites            Favorite[]
+  journeySegments      JourneySegment[]
+  packageItems         PackageItem[]
+  photos               Photo[]
+  priceAlerts          PriceAlert[]
+  promotedListings     PromotedListing[]
+  recommendationScores RecommendationScore[]
+  reviews              Review[]
+  supplier             Supplier              @relation(fields: [supplierId], references: [id])
+  tourService          TourService?
+  transportService     TransportService?
+  userInteractions     UserInteraction[]
+
+  @@index([name])
+  @@index([type])
+  @@index([status])
+  @@index([isActive])
+  @@index([price])
+  @@index([capacity])
+  @@index([createdAt(sort: Desc)])
+  @@index([supplierId])
+  @@index([type, status, isActive])
+  @@index([price, type])
+  @@map("services")
+}
+
+model TransportService {
+  id                  Int           @id @default(autoincrement())
+  serviceId           Int           @unique
+  transportType       TransportType
+  departureLocationId Int
+  arrivalLocationId   Int
+  departureTime       DateTime?
+  arrivalTime         DateTime?
+  isScheduled         Boolean       @default(false)
+  vehicleCapacity     Int?
+  vehicleType         String?
+  amenities           String[]      @default([])
+
+  // API Integration fields
+  apiProvider        String? // "jadrolinija", "krilo", "kapetan_luka", "arriva", "flixbus"
+  apiOperatorId      String? // External operator ID from their API
+  apiRouteId         String? // External route ID from their API
+  requiresRealTime   Boolean @default(false) // Whether to check availability via API in real-time
+  externalBookingUrl String? // Fallback URL if API booking fails
+  operatorName       String? // Display name: "Jadrolinija", "Krilo", "FlixBus"
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  busSchedules      BusSchedule[]
+  ferrySchedules    FerrySchedule[]
+  arrivalLocation   Location        @relation("ArrivalLocation", fields: [arrivalLocationId], references: [id])
+  departureLocation Location        @relation("DepartureLocation", fields: [departureLocationId], references: [id])
+  service           Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("transport_services")
+}
+
+model BusSchedule {
+  id                 Int               @id @default(autoincrement())
+  transportServiceId Int?
+  operator           BusOperator
+  busNumber          String?
+  routeName          String
+  departureStopId    Int
+  arrivalStopId      Int
+  departureTime      DateTime
+  arrivalTime        DateTime
+  duration           Int
+  totalCapacity      Int
+  availableSeats     Int               @default(0)
+  adultPrice         Decimal
+  childPrice         Decimal?
+  seniorPrice        Decimal?
+  currency           String            @default("EUR")
+  status             ScheduleStatus    @default(SCHEDULED)
+  operatingDays      String[]          @default([])
+  seasonStart        DateTime?
+  seasonEnd          DateTime?
+  externalId         String?
+  lastSyncedAt       DateTime?
+  amenities          String[]          @default([])
+  busType            String?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  bookings           BusBooking[]
+  arrivalStop        Location          @relation("BusArrival", fields: [arrivalStopId], references: [id])
+  departureStop      Location          @relation("BusDeparture", fields: [departureStopId], references: [id])
+  transportService   TransportService? @relation(fields: [transportServiceId], references: [id])
+
+  @@index([departureStopId, arrivalStopId, departureTime])
+  @@index([operator])
+  @@index([status])
+  @@index([departureTime])
+  @@map("bus_schedules")
+}
+
+model BusBooking {
+  id            Int         @id @default(autoincrement())
+  busScheduleId Int
+  bookingId     Int
+  adults        Int         @default(1)
+  children      Int         @default(0)
+  seniors       Int         @default(0)
+  seatNumbers   String[]    @default([])
+  totalPrice    Decimal
+  currency      String      @default("EUR")
+  operatorRef   String?
+  isConfirmed   Boolean     @default(false)
+  isCancelled   Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  booking       Booking     @relation(fields: [bookingId], references: [id])
+  busSchedule   BusSchedule @relation(fields: [busScheduleId], references: [id])
+
+  @@index([busScheduleId])
+  @@index([bookingId])
+  @@map("bus_bookings")
+}
+
+model FerrySchedule {
+  id                 Int               @id @default(autoincrement())
+  transportServiceId Int?
+  operator           FerryOperator
+  vesselName         String
+  routeName          String
+  departurePortId    Int
+  arrivalPortId      Int
+  departureTime      DateTime
+  arrivalTime        DateTime
+  duration           Int
+  totalCapacity      Int
+  vehicleCapacity    Int?
+  availableSeats     Int               @default(0)
+  availableVehicles  Int?              @default(0)
+  adultPrice         Decimal
+  childPrice         Decimal?
+  vehiclePrice       Decimal?
+  currency           String            @default("EUR")
+  status             ScheduleStatus    @default(SCHEDULED)
+  operatingDays      String[]          @default([])
+  seasonStart        DateTime?
+  seasonEnd          DateTime?
+  externalId         String?
+  lastSyncedAt       DateTime?
+  amenities          String[]          @default([])
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  bookings           FerryBooking[]
+  arrivalPort        Location          @relation("FerryArrival", fields: [arrivalPortId], references: [id])
+  departurePort      Location          @relation("FerryDeparture", fields: [departurePortId], references: [id])
+  transportService   TransportService? @relation(fields: [transportServiceId], references: [id])
+
+  @@index([departurePortId, arrivalPortId, departureTime])
+  @@index([operator])
+  @@index([status])
+  @@index([departureTime])
+  @@map("ferry_schedules")
+}
+
+model FerryBooking {
+  id              Int           @id @default(autoincrement())
+  ferryScheduleId Int
+  bookingId       Int
+  adults          Int           @default(1)
+  children        Int           @default(0)
+  vehicles        Int           @default(0)
+  totalPrice      Decimal
+  currency        String        @default("EUR")
+  operatorRef     String?
+  isConfirmed     Boolean       @default(false)
+  isCancelled     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  booking         Booking       @relation(fields: [bookingId], references: [id])
+  ferrySchedule   FerrySchedule @relation(fields: [ferryScheduleId], references: [id])
+
+  @@index([ferryScheduleId])
+  @@index([bookingId])
+  @@map("ferry_bookings")
+}
+
+model AccommodationService {
+  id                Int               @id @default(autoincrement())
+  serviceId         Int               @unique
+  locationId        Int
+  accommodationType AccommodationType
+  bedrooms          Int?
+  bathrooms         Int?
+  maxGuests         Int
+  amenities         String[]          @default([])
+  checkInTime       String?
+  checkOutTime      String?
+  minimumStay       Int?
+  instantBook       Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  location          Location          @relation(fields: [locationId], references: [id])
+  service           Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("accommodation_services")
+}
+
+model TourService {
+  id                 Int      @id @default(autoincrement())
+  serviceId          Int      @unique
+  locationId         Int
+  tourType           String
+  meetingPoint       String?
+  includes           String[] @default([])
+  excludes           String[] @default([])
+  difficulty         String?
+  languages          String[] @default(["en"])
+  groupSizeMax       Int?
+  cancellationPolicy String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  location           Location @relation(fields: [locationId], references: [id])
+  service            Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("tour_services")
+}
+
+model ActivityService {
+  id             Int      @id @default(autoincrement())
+  serviceId      Int      @unique
+  locationId     Int
+  activityType   String
+  ageRestriction String?
+  equipment      String[] @default([])
+  skillLevel     String?
+  seasonality    String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  location       Location @relation(fields: [locationId], references: [id])
+  service        Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("activity_services")
+}
+
+model Booking {
+  id                 Int                   @id @default(autoincrement())
+  userId             Int
+  supplierId         Int
+  bookingReference   String                @unique @default(cuid())
+  packageBookingId   String? // Groups multiple bookings from different suppliers (journey/package)
+  status             BookingStatus         @default(PENDING)
+  totalAmount        Decimal
+  currency           String                @default("EUR")
+  commission         Decimal               @default(0)
+  bookingDate        DateTime              @default(now())
+  serviceDate        DateTime
+  notes              String?
+  cancellationReason String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  groupCoordinator   String?
+  groupDiscount      Decimal?
+  groupSize          Int?
+  isGroupBooking     Boolean               @default(false)
+  packageId          Int?
+  bookingItems       BookingItem[]
+  modifications      BookingModification[]
+  package            ServicePackage?       @relation(fields: [packageId], references: [id])
+  supplier           Supplier              @relation(fields: [supplierId], references: [id])
+  user               User                  @relation(fields: [userId], references: [id])
+  busBookings        BusBooking[]
+  conversations      Conversation[]
+  disputes           Dispute[]
+  ferryBookings      FerryBooking[]
+  journeySegments    JourneySegment[]
+  payments           Payment[]
+  priceAlerts        PriceAlert[]          @relation("BookingAlerts")
+  review             Review?
+
+  @@index([serviceDate, status])
+  @@index([userId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([isGroupBooking])
+  @@index([packageId])
+  @@index([packageBookingId])
+  @@map("bookings")
+}
+
+model BookingItem {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int
+  serviceId  Int
+  quantity   Int      @default(1)
+  unitPrice  Decimal
+  totalPrice Decimal
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service    Service  @relation(fields: [serviceId], references: [id])
+
+  @@index([serviceId])
+  @@index([bookingId])
+  @@map("booking_items")
+}
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  bookingId       Int
+  amount          Decimal
+  currency        String        @default("EUR")
+  status          PaymentStatus @default(PENDING)
+  method          PaymentMethod
+  stripePaymentId String?
+  metadata        Json?
+  processedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  booking         Booking       @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+model Commission {
+  id               Int       @id @default(autoincrement())
+  supplierId       Int
+  amount           Decimal
+  rate             Float
+  bookingReference String
+  status           String    @default("pending")
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  supplier         Supplier  @relation(fields: [supplierId], references: [id])
+
+  @@map("commissions")
+}
+
+model Event {
+  id           Int       @id @default(autoincrement())
+  locationId   Int
+  name         String
+  description  String?
+  startDate    DateTime
+  endDate      DateTime?
+  price        Decimal?
+  currency     String    @default("EUR")
+  maxAttendees Int?
+  category     String
+  organizer    String?
+  website      String?
+  ticketUrl    String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  location     Location  @relation(fields: [locationId], references: [id])
+  photos       Photo[]
+
+  @@map("events")
+}
+
+model Review {
+  id             Int        @id @default(autoincrement())
+  userId         Int
+  serviceId      Int?
+  supplierId     Int?
+  bookingId      Int        @unique
+  reviewType     ReviewType
+  wouldRecommend Boolean
+  tag            ReviewTag
+  isPublished    Boolean    @default(false)
+  publishAt      DateTime
+  isVerified     Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  booking        Booking    @relation(fields: [bookingId], references: [id])
+  service        Service?   @relation(fields: [serviceId], references: [id])
+  supplier       Supplier?  @relation("SupplierReviews", fields: [supplierId], references: [id])
+  user           User       @relation(fields: [userId], references: [id])
+
+  @@index([serviceId, isPublished])
+  @@index([supplierId, isPublished])
+  @@index([reviewType])
+  @@index([publishAt])
+  @@map("reviews")
+}
+
+model Photo {
+  id         Int       @id @default(autoincrement())
+  serviceId  Int?
+  locationId Int?
+  eventId    Int?
+  url        String
+  altText    String?
+  caption    String?
+  sortOrder  Int       @default(0)
+  isMain     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  event      Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  service    Service?  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("photos")
+}
+
+model DensityReading {
+  id         Int      @id @default(autoincrement())
+  locationId Int
+  density    Float
+  timestamp  DateTime @default(now())
+  source     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  location   Location @relation(fields: [locationId], references: [id])
+
+  @@map("density_readings")
+}
+
+model TripItinerary {
+  id             Int               @id @default(autoincrement())
+  userId         Int
+  name           String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime
+  totalBudget    Decimal?
+  currency       String            @default("EUR")
+  isAIGenerated  Boolean           @default(false)
+  isPublic       Boolean           @default(false)
+  data           Json
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  sharedVersions SharedItinerary[]
+  stories        TravelStory[]
+  user           User              @relation(fields: [userId], references: [id])
+
+  @@map("trip_itineraries")
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  serviceId Int
+  createdAt DateTime @default(now())
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([serviceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("favorites")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model Conversation {
+  id                  Int                     @id @default(autoincrement())
+  guestId             Int
+  supplierId          Int
+  bookingId           Int?
+  lastMessageAt       DateTime                @default(now())
+  guestUnreadCount    Int                     @default(0)
+  supplierUnreadCount Int                     @default(0)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  booking             Booking?                @relation(fields: [bookingId], references: [id])
+  guest               User                    @relation("GuestConversations", fields: [guestId], references: [id])
+  supplier            User                    @relation("SupplierConversations", fields: [supplierId], references: [id])
+  messages            Message[]
+  disputes            Dispute[]
+  accessLogs          ConversationAccessLog[]
+
+  @@unique([guestId, supplierId, bookingId])
+  @@index([guestId])
+  @@index([supplierId])
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  content        String
+  isRead         Boolean      @default(false)
+  isFlagged      Boolean      @default(false)
+  flaggedBy      Int?
+  flagReason     String?
+  flaggedAt      DateTime?
+  reviewedBy     Int?
+  reviewedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([isFlagged])
+  @@index([createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+model Dispute {
+  id              Int           @id @default(autoincrement())
+  bookingId       Int
+  initiatorId     Int
+  respondentId    Int
+  type            DisputeType
+  status          DisputeStatus @default(OPEN)
+  title           String
+  description     String
+  conversationId  Int?
+  assignedAdminId Int?
+  resolution      String?
+  refundAmount    Decimal?
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id])
+  initiator       User          @relation("DisputeInitiator", fields: [initiatorId], references: [id])
+  respondent      User          @relation("DisputeRespondent", fields: [respondentId], references: [id])
+  assignedAdmin   User?         @relation("DisputeAssignedAdmin", fields: [assignedAdminId], references: [id])
+
+  @@index([bookingId])
+  @@index([initiatorId])
+  @@index([status])
+  @@index([assignedAdminId])
+  @@map("disputes")
+}
+
+model ConversationAccessLog {
+  id             Int          @id @default(autoincrement())
+  conversationId Int
+  adminId        Int
+  reason         String
+  accessedAt     DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  admin          User         @relation("ConversationAccessLog", fields: [adminId], references: [id])
+
+  @@index([conversationId])
+  @@index([adminId])
+  @@map("conversation_access_logs")
+}
+
+model Journey {
+  id               Int              @id @default(autoincrement())
+  userId           Int
+  status           JourneyStatus    @default(PLANNING)
+  name             String?
+  originLocationId Int
+  destLocationId   Int
+  startDate        DateTime
+  endDate          DateTime
+  totalPrice       Decimal          @default(0)
+  currency         String           @default("EUR")
+  travelers        Int              @default(1)
+  preferences      Json?
+  optimizedRoute   Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  segments         JourneySegment[]
+  destLocation     Location         @relation("JourneyDestination", fields: [destLocationId], references: [id])
+  originLocation   Location         @relation("JourneyOrigin", fields: [originLocationId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate])
+  @@index([createdAt(sort: Desc)])
+  @@map("journeys")
+}
+
+model JourneySegment {
+  id                  Int         @id @default(autoincrement())
+  journeyId           Int
+  segmentType         SegmentType
+  segmentOrder        Int
+  serviceId           Int?
+  bookingId           Int?
+  departureLocationId Int?
+  arrivalLocationId   Int?
+  departureTime       DateTime?
+  arrivalTime         DateTime?
+  duration            Int?
+  price               Decimal     @default(0)
+  currency            String      @default("EUR")
+  isBooked            Boolean     @default(false)
+  isConfirmed         Boolean     @default(false)
+  isCancelled         Boolean     @default(false)
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  notes               String?
+  metadata            Json?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  arrivalLocation     Location?   @relation("SegmentArrival", fields: [arrivalLocationId], references: [id])
+  booking             Booking?    @relation(fields: [bookingId], references: [id])
+  departureLocation   Location?   @relation("SegmentDeparture", fields: [departureLocationId], references: [id])
+  journey             Journey     @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  service             Service?    @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([journeyId])
+  @@index([segmentOrder])
+  @@index([serviceId])
+  @@index([isBooked])
+  @@map("journey_segments")
+}
+
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  userId      Int?
+  action      AuditAction
+  entity      String
+  entityId    Int?
+  description String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  endpoint    String?
+  method      String?
+  statusCode  Int?
+  createdAt   DateTime    @default(now())
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model CrowdDataPoint {
+  id                  Int        @id @default(autoincrement())
+  locationId          Int
+  crowdIndex          Float
+  crowdLevel          CrowdLevel
+  googleLiveScore     Float?
+  googleHistoricScore Float?
+  instagramScore      Float?
+  tiktokScore         Float?
+  weatherScore        Float?
+  eventScore          Float?
+  sensorScore         Float?
+  timestamp           DateTime   @default(now())
+  isPrediction        Boolean    @default(false)
+  predictionFor       DateTime?
+  confidence          Float?
+  temperature         Float?
+  weatherCondition    String?
+  activeEvents        String[]   @default([])
+  notes               String?
+  createdAt           DateTime   @default(now())
+  location            Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, timestamp])
+  @@index([locationId, isPrediction, predictionFor])
+  @@index([crowdLevel])
+  @@index([timestamp])
+  @@map("crowd_data_points")
+}
+
+model SocialTrend {
+  id              Int      @id @default(autoincrement())
+  locationId      Int
+  platform        String
+  postCount       Int      @default(0)
+  storyCount      Int      @default(0)
+  hashtagVelocity Float    @default(0)
+  engagement      Float    @default(0)
+  hashtags        String[] @default([])
+  timestamp       DateTime @default(now())
+  hourOfDay       Int
+  dayOfWeek       String
+  rawData         Json?
+  createdAt       DateTime @default(now())
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, platform, timestamp])
+  @@map("social_trends")
+}
+
+model WeatherSnapshot {
+  id               Int       @id @default(autoincrement())
+  locationId       Int
+  temperature      Float
+  feelsLike        Float?
+  humidity         Int?
+  uvIndex          Float?
+  windSpeed        Float?
+  cloudCover       Int?
+  precipitation    Float?
+  weatherCondition String
+  waveHeight       Float?
+  seaTemperature   Float?
+  timestamp        DateTime  @default(now())
+  forecastFor      DateTime?
+  source           String    @default("openweathermap")
+  createdAt        DateTime  @default(now())
+  location         Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, timestamp])
+  @@index([locationId, forecastFor])
+  @@map("weather_snapshots")
+}
+
+model Sensor {
+  id                Int             @id @default(autoincrement())
+  locationId        Int
+  sensorType        String
+  name              String
+  macAddress        String?         @unique
+  ipAddress         String?
+  capacity          Int?
+  threshold         Float?
+  isActive          Boolean         @default(true)
+  calibrationFactor Float           @default(1.0)
+  lastCalibrated    DateTime?
+  installDate       DateTime?
+  location          String?
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  readings          SensorReading[]
+  locationRelation  Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, isActive])
+  @@index([sensorType])
+  @@map("sensors")
+}
+
+model SensorReading {
+  id         Int      @id @default(autoincrement())
+  sensorId   Int
+  count      Int
+  rawValue   Float?
+  timestamp  DateTime @default(now())
+  confidence Float?
+  createdAt  DateTime @default(now())
+  sensor     Sensor   @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@index([sensorId, timestamp])
+  @@map("sensor_readings")
+}
+
+model CrowdPrediction {
+  id                Int        @id @default(autoincrement())
+  locationId        Int
+  predictedIndex    Float
+  predictedLevel    CrowdLevel
+  predictionFor     DateTime
+  generatedAt       DateTime   @default(now())
+  confidence        Float
+  modelVersion      String?
+  historicalPattern Float?
+  weatherImpact     Float?
+  eventImpact       Float?
+  trendImpact       Float?
+  isBestTime        Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  location          Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, predictionFor])
+  @@index([predictionFor])
+  @@map("crowd_predictions")
+}
+
+model BusinessProfile {
+  id             Int       @id @default(autoincrement())
+  supplierId     Int       @unique
+  locationId     Int
+  tier           String    @default("free")
+  isFeatured     Boolean   @default(false)
+  featuredUntil  DateTime?
+  monthlyFee     Decimal   @default(0)
+  cpcBid         Decimal?
+  hasAnalytics   Boolean   @default(false)
+  hasAPI         Boolean   @default(false)
+  alertThreshold Float?
+  notifyOnQuiet  Boolean   @default(false)
+  dashboardData  Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  location       Location  @relation(fields: [locationId], references: [id])
+  supplier       Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, isFeatured])
+  @@index([tier])
+  @@map("business_profiles")
+}
+
+model CrowdAlert {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  locationId  Int
+  alertType   String
+  threshold   Float?
+  isTriggered Boolean   @default(false)
+  triggeredAt DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([locationId, isTriggered])
+  @@map("crowd_alerts")
+}
+
+model ServicePackage {
+  id           Int           @id @default(autoincrement())
+  supplierId   Int
+  name         String
+  description  String?
+  packagePrice Decimal
+  regularPrice Decimal
+  savings      Decimal
+  currency     String        @default("EUR")
+  status       PackageStatus @default(ACTIVE)
+  validFrom    DateTime?
+  validUntil   DateTime?
+  maxGuests    Int?
+  minGuests    Int           @default(1)
+  tags         String[]      @default([])
+  imageUrl     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  bookings     Booking[]
+  items        PackageItem[]
+  supplier     Supplier      @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@index([status])
+  @@map("service_packages")
+}
+
+model PackageItem {
+  id         Int            @id @default(autoincrement())
+  packageId  Int
+  serviceId  Int
+  quantity   Int            @default(1)
+  sortOrder  Int            @default(0)
+  isOptional Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  package    ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  service    Service        @relation(fields: [serviceId], references: [id])
+
+  @@index([packageId])
+  @@index([serviceId])
+  @@map("package_items")
+}
+
+model PriceAlert {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  serviceId   Int?
+  bookingId   Int?
+  alertType   AlertType @default(PRICE_DROP)
+  targetPrice Decimal?
+  percentage  Int?
+  startDate   DateTime?
+  endDate     DateTime?
+  guests      Int?
+  isActive    Boolean   @default(true)
+  isTriggered Boolean   @default(false)
+  triggeredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  booking     Booking?  @relation("BookingAlerts", fields: [bookingId], references: [id], onDelete: Cascade)
+  service     Service?  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([serviceId, isActive])
+  @@index([isTriggered])
+  @@map("price_alerts")
+}
+
+model BookingModification {
+  id               Int              @id @default(autoincrement())
+  bookingId        Int
+  modificationType ModificationType
+  previousData     Json?
+  newData          Json?
+  priceDifference  Decimal?
+  currency         String           @default("EUR")
+  status           String           @default("pending")
+  reason           String?
+  approvedBy       Int?
+  approvedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  booking          Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("booking_modifications")
+}
+
+model SubscriptionEvent {
+  id             Int                   @id @default(autoincrement())
+  userId         Int
+  eventType      SubscriptionEventType
+  subscriptionId String?
+  previousTier   String?
+  newTier        String?
+  amount         Decimal?
+  currency       String                @default("EUR")
+  metadata       Json?
+  stripeEventId  String?
+  createdAt      DateTime              @default(now())
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([stripeEventId])
+  @@map("subscription_events")
+}
+
+model SupplierAddon {
+  id                   Int               @id @default(autoincrement())
+  supplierId           Int
+  addonType            SupplierAddonType
+  status               AddonStatus       @default(ACTIVE)
+  monthlyPrice         Decimal
+  currency             String            @default("EUR")
+  stripeSubscriptionId String?           @unique
+  stripePriceId        String?
+  startDate            DateTime          @default(now())
+  endDate              DateTime?
+  trialEndsAt          DateTime?
+  cancelAtPeriodEnd    Boolean           @default(false)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  supplier             Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([addonType])
+  @@index([status])
+  @@map("supplier_addons")
+}
+
+model SupplierApiKey {
+  id           Int       @id @default(autoincrement())
+  supplierId   Int
+  name         String
+  keyHash      String    @unique
+  keyPreview   String
+  isActive     Boolean   @default(true)
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  requestCount Int       @default(0)
+  rateLimit    Int       @default(1000)
+  scopes       String[]  @default([])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  supplier     Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([keyHash])
+  @@index([isActive])
+  @@map("supplier_api_keys")
+}
+
+model PromotedListing {
+  id           Int      @id @default(autoincrement())
+  serviceId    Int
+  supplierId   Int
+  startDate    DateTime
+  endDate      DateTime
+  position     Int?
+  isFeatured   Boolean  @default(false)
+  boostedScore Float    @default(1.0)
+  dailyBudget  Decimal?
+  totalSpent   Decimal  @default(0)
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  bookings     Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@index([supplierId])
+  @@index([isActive])
+  @@index([startDate, endDate])
+  @@map("promoted_listings")
+}
+
+model SupplierSupportTicket {
+  id          Int                      @id @default(autoincrement())
+  supplierId  Int
+  subject     String
+  description String
+  status      String                   @default("open")
+  priority    String                   @default("normal")
+  category    String?
+  isPriority  Boolean                  @default(false)
+  assignedTo  Int?
+  resolvedAt  DateTime?
+  resolvedBy  Int?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  messages    SupplierSupportMessage[]
+  supplier    Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([priority])
+  @@index([isPriority])
+  @@map("supplier_support_tickets")
+}
+
+model SupplierSupportMessage {
+  id          Int                   @id @default(autoincrement())
+  ticketId    Int
+  userId      Int?
+  message     String
+  isInternal  Boolean               @default(false)
+  attachments String[]              @default([])
+  createdAt   DateTime              @default(now())
+  ticket      SupplierSupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("supplier_support_messages")
+}
+
+model SharedItinerary {
+  id                 Int                @id @default(autoincrement())
+  itineraryId        Int
+  sharedBy           Int
+  visibility         ShareVisibility    @default(PUBLIC)
+  views              Int                @default(0)
+  likes              Int                @default(0)
+  forks              Int                @default(0)
+  title              String?
+  description        String?
+  coverPhoto         String?
+  tags               String[]           @default([])
+  allowCollaboration Boolean            @default(false)
+  collaborators      Int[]              @default([])
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  comments           ItineraryComment[]
+  likes_users        ItineraryLike[]
+  itinerary          TripItinerary      @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  owner              User               @relation("SharedItineraryOwner", fields: [sharedBy], references: [id])
+
+  @@index([sharedBy])
+  @@index([visibility])
+  @@index([isActive])
+  @@map("shared_itineraries")
+}
+
+model ItineraryComment {
+  id                Int                @id @default(autoincrement())
+  sharedItineraryId Int
+  userId            Int
+  comment           String
+  parentId          Int?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  parent            ItineraryComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies           ItineraryComment[] @relation("CommentReplies")
+  sharedItinerary   SharedItinerary    @relation(fields: [sharedItineraryId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id])
+
+  @@index([sharedItineraryId])
+  @@index([userId])
+  @@map("itinerary_comments")
+}
+
+model ItineraryLike {
+  id                Int             @id @default(autoincrement())
+  sharedItineraryId Int
+  userId            Int
+  createdAt         DateTime        @default(now())
+  sharedItinerary   SharedItinerary @relation(fields: [sharedItineraryId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id])
+
+  @@unique([sharedItineraryId, userId])
+  @@index([userId])
+  @@map("itinerary_likes")
+}
+
+model TravelStory {
+  id          Int             @id @default(autoincrement())
+  userId      Int
+  title       String
+  content     String
+  locationId  Int?
+  itineraryId Int?
+  bookingId   Int?
+  photos      String[]        @default([])
+  coverPhoto  String?
+  visibility  ShareVisibility @default(PUBLIC)
+  tags        String[]        @default([])
+  views       Int             @default(0)
+  likes       Int             @default(0)
+  isPublished Boolean         @default(true)
+  publishedAt DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  comments    StoryComment[]
+  likes_users StoryLike[]
+  itinerary   TripItinerary?  @relation(fields: [itineraryId], references: [id])
+  location    Location?       @relation(fields: [locationId], references: [id])
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([locationId])
+  @@index([visibility])
+  @@index([publishedAt])
+  @@map("travel_stories")
+}
+
+model StoryComment {
+  id        Int            @id @default(autoincrement())
+  storyId   Int
+  userId    Int
+  comment   String
+  parentId  Int?
+  createdAt DateTime       @default(now())
+  parent    StoryComment?  @relation("StoryReplies", fields: [parentId], references: [id])
+  replies   StoryComment[] @relation("StoryReplies")
+  story     TravelStory    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id])
+
+  @@index([storyId])
+  @@index([userId])
+  @@map("story_comments")
+}
+
+model StoryLike {
+  id        Int         @id @default(autoincrement())
+  storyId   Int
+  userId    Int
+  createdAt DateTime    @default(now())
+  story     TravelStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@unique([storyId, userId])
+  @@index([userId])
+  @@map("story_likes")
+}
+
+model Friendship {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  friendId    Int
+  status      String   @default("pending")
+  requestedBy Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  friend      User     @relation("FriendFriendships", fields: [friendId], references: [id], onDelete: Cascade)
+  user        User     @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+  @@index([status])
+  @@map("friendships")
+}
+
+model UserActivity {
+  id           Int             @id @default(autoincrement())
+  userId       Int
+  activityType String
+  bookingId    Int?
+  itineraryId  Int?
+  storyId      Int?
+  serviceId    Int?
+  metadata     Json?
+  visibility   ShareVisibility @default(PUBLIC)
+  createdAt    DateTime        @default(now())
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@index([visibility])
+  @@map("user_activities")
+}
+
+model UserPreferences {
+  id                  Int                @id @default(autoincrement())
+  userId              Int                @unique
+  travelStyles        TravelStyle[]      @default([])
+  interests           InterestCategory[] @default([])
+  minBudget           Decimal?
+  maxBudget           Decimal?
+  currency            String             @default("EUR")
+  preferredStarRating Int?
+  preferredAmenities  String[]           @default([])
+  activityLevelMin    Int?
+  activityLevelMax    Int?
+  preferredDuration   String?
+  preferredRegions    String[]           @default([])
+  avoidCrowds         Boolean            @default(false)
+  bookingHistory      Json?
+  clickPatterns       Json?
+  searchHistory       Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_preferences")
+}
+
+model UserInteraction {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  serviceId       Int
+  interactionType String
+  searchQuery     String?
+  referrer        String?
+  duration        Int?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  service         Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([serviceId])
+  @@index([interactionType])
+  @@index([createdAt])
+  @@map("user_interactions")
+}
+
+model RecommendationScore {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  serviceId       Int
+  preferenceScore Decimal  @default(0)
+  behaviorScore   Decimal  @default(0)
+  popularityScore Decimal  @default(0)
+  seasonalScore   Decimal  @default(0)
+  proximityScore  Decimal  @default(0)
+  totalScore      Decimal  @default(0)
+  reasoning       String?
+  computedAt      DateTime @default(now())
+  expiresAt       DateTime
+  service         Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([totalScore])
+  @@index([expiresAt])
+  @@map("recommendation_scores")
+}
+
+model SmartSuggestion {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  suggestionType String
+  title          String
+  description    String
+  serviceIds     Int[]    @default([])
+  reasoning      String?
+  priority       Int      @default(0)
+  validFrom      DateTime @default(now())
+  validUntil     DateTime
+  viewed         Boolean  @default(false)
+  clicked        Boolean  @default(false)
+  dismissed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([suggestionType])
+  @@index([validUntil])
+  @@index([priority])
+  @@map("smart_suggestions")
+}
+
+model ChatConversation {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  title         String?
+  context       String?
+  isActive      Boolean       @default(true)
+  lastMessageAt DateTime      @default(now())
+  summary       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      ChatMessage[]
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([lastMessageAt])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             Int              @id @default(autoincrement())
+  conversationId Int
+  role           String
+  content        String
+  model          String?
+  tokens         Int?
+  attachments    Json?
+  createdAt      DateTime         @default(now())
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+model DynamicPricing {
+  id                 Int       @id @default(autoincrement())
+  serviceId          Int
+  startDate          DateTime
+  endDate            DateTime
+  basePrice          Decimal
+  demandMultiplier   Decimal   @default(1.0)
+  seasonalMultiplier Decimal   @default(1.0)
+  crowdMultiplier    Decimal   @default(1.0)
+  suggestedPrice     Decimal
+  minPrice           Decimal
+  maxPrice           Decimal
+  confidence         Decimal   @default(0.5)
+  isActive           Boolean   @default(false)
+  appliedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  service            Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@index([startDate, endDate])
+  @@index([isActive])
+  @@map("dynamic_pricing")
+}
 
 enum UserRole {
   TOURIST
@@ -27,110 +1568,25 @@ enum UserStatus {
 }
 
 enum ReviewType {
-  GUEST_TO_SUPPLIER // Guest reviewing supplier/service
-  SUPPLIER_TO_GUEST // Supplier reviewing guest
+  GUEST_TO_SUPPLIER
+  SUPPLIER_TO_GUEST
 }
 
-model User {
-  id                      Int        @id @default(autoincrement())
-  email                   String     @unique
-  firstName               String?
-  lastName                String?
-  hash                    String
-  role                    UserRole   @default(TOURIST)
-  status                  UserStatus @default(INACTIVE)
-  phone                   String?
-  avatar                  String?
-  emailVerified           Boolean    @default(false)
-  emailVerificationToken  String?
-  verificationTokenExpiry DateTime?
-  resetToken              String?
-  resetTokenExpiry        DateTime?
-
-  // Premium Subscription
-  subscriptionTier        String?    @default("FREE") // FREE, PREMIUM
-  subscriptionStatus      String?    // active, canceled, past_due, trialing
-  stripeCustomerId        String?    @unique
-  stripeSubscriptionId    String?    @unique
-  subscriptionStartDate   DateTime?
-  subscriptionEndDate     DateTime?
-  trialEndsAt             DateTime?
-  cancelAtPeriodEnd       Boolean    @default(false)
-
-  // GDPR Compliance
-  privacyPolicyAccepted   Boolean    @default(false)
-  privacyPolicyAcceptedAt DateTime?
-  termsAccepted           Boolean    @default(false)
-  termsAcceptedAt         DateTime?
-  marketingConsent        Boolean    @default(false)
-  marketingConsentAt      DateTime?
-  dataProcessingConsent   Boolean    @default(false)
-  dataProcessingConsentAt DateTime?
-  deletionRequestedAt     DateTime? // Tracks when user requested deletion
-  scheduledDeletionAt     DateTime? // When account will be permanently deleted
-
-  createdAt               DateTime   @default(now())
-  updatedAt               DateTime   @updatedAt
-
-  // Relations
-  profile              UserProfile?
-  bookings             Booking[]
-  reviews              Review[]
-  suppliers            Supplier[]
-  itineraries          TripItinerary[]
-  notifications        Notification[]
-  guestConversations   Conversation[]  @relation("GuestConversations")
-  supplierConversations Conversation[] @relation("SupplierConversations")
-  messages             Message[]
-  favorites            Favorite[]
-  auditLogs            AuditLog[]
-  journeys             Journey[]
-  crowdAlerts          CrowdAlert[]
-  priceAlerts          PriceAlert[]
-  subscriptionEvents   SubscriptionEvent[]
-
-  // Social features
-  sharedItineraries    SharedItinerary[]   @relation("SharedItineraryOwner")
-  itineraryComments    ItineraryComment[]
-  itineraryLikes       ItineraryLike[]
-  travelStories        TravelStory[]
-  storyComments        StoryComment[]
-  storyLikes           StoryLike[]
-  friendships          Friendship[]        @relation("UserFriendships")
-  friendOf             Friendship[]        @relation("FriendFriendships")
-  activities           UserActivity[]
-
-  // AI & Personalization
-  preferences          UserPreferences?
-  interactions         UserInteraction[]
-  recommendationScores RecommendationScore[]
-  smartSuggestions     SmartSuggestion[]
-  chatConversations    ChatConversation[]
-
-  @@map("users")
+enum ReviewTag {
+  // Positive tags
+  SUPER_CLEAN
+  AMAZING_HOST
+  GREAT_LOCATION
+  GOOD_VALUE
+  QUIET_AREA
+  PERFECT_FOR_FAMILIES
+  // Negative tags
+  NOT_CLEAN
+  POOR_COMMUNICATION
+  TOO_NOISY
+  BAD_LOCATION
+  PRICE_TOO_HIGH
 }
-
-model UserProfile {
-  id               Int      @id @default(autoincrement())
-  userId           Int      @unique
-  preferences      Json? // Travel preferences, accessibility needs
-  emergencyContact String?
-  nationality      String?
-  passportNumber   String?
-  loyaltyPoints    Int      @default(0)
-  totalSpent       Decimal  @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_profiles")
-}
-
-// ============================================
-// LOCATIONS & GEOGRAPHY
-// ============================================
 
 enum LocationType {
   ISLAND
@@ -143,100 +1599,11 @@ enum LocationType {
   AIRPORT
 }
 
-model Location {
-  id           Int          @id @default(autoincrement())
-  name         String
-  slug         String       @unique
-  type         LocationType
-  description  String?
-  latitude     Float
-  longitude    Float
-  address      String?
-  parentId     Int?
-  isActive     Boolean      @default(true)
-  crowdCapacity Int?        // Maximum capacity for crowd calculations
-  metadata     Json? // Opening hours, capacity, etc.
-  translations Json? // Multi-language content: { "hr": { "name": "", "description": "" }, "de": {...} }
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  // Relations
-  parent   Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
-  children Location[] @relation("LocationHierarchy")
-
-  accommodations      AccommodationService[]
-  tours               TourService[]
-  activities          ActivityService[]
-  transportDepartures TransportService[]     @relation("DepartureLocation")
-  transportArrivals   TransportService[]     @relation("ArrivalLocation")
-  events              Event[]
-  densityReadings     DensityReading[]
-  photos              Photo[]
-  journeyOrigins      Journey[]              @relation("JourneyOrigin")
-  journeyDestinations Journey[]              @relation("JourneyDestination")
-  segmentDepartures   JourneySegment[]       @relation("SegmentDeparture")
-  segmentArrivals     JourneySegment[]       @relation("SegmentArrival")
-  ferryDepartures     FerrySchedule[]        @relation("FerryDeparture")
-  ferryArrivals       FerrySchedule[]        @relation("FerryArrival")
-  busDepartures       BusSchedule[]          @relation("BusDeparture")
-  busArrivals         BusSchedule[]          @relation("BusArrival")
-
-  // Crowd Intelligence
-  crowdData           CrowdDataPoint[]
-  socialTrends        SocialTrend[]
-  weatherSnapshots    WeatherSnapshot[]
-  sensors             Sensor[]
-  crowdPredictions    CrowdPrediction[]
-  businessProfiles    BusinessProfile[]
-  crowdAlerts         CrowdAlert[]
-  travelStories       TravelStory[]
-
-  @@index([latitude, longitude])
-  @@index([type])
-  @@index([isActive])
-  @@map("locations")
-}
-
-// ============================================
-// SUPPLIERS & SERVICES
-// ============================================
-
 enum SupplierStatus {
   PENDING
   APPROVED
   SUSPENDED
   REJECTED
-}
-
-model Supplier {
-  id                 Int            @id @default(autoincrement())
-  userId             Int
-  businessName       String
-  registrationNum    String?
-  vatNumber          String?
-  status             SupplierStatus @default(PENDING)
-  commissionRate     Float          @default(0.15) // 15% default
-  subscriptionTier   String? // Basic, Premium, Enterprise
-  subscriptionExpiry DateTime?
-  bankAccount        String?
-  payoutSchedule     String?        @default("weekly")
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-
-  // Relations
-  user            User             @relation(fields: [userId], references: [id])
-  services        Service[]
-  bookings        Booking[]
-  reviews         Review[]         @relation("SupplierReviews")
-  commissions     Commission[]
-  businessProfile BusinessProfile?
-  packages        ServicePackage[]
-  addons          SupplierAddon[]
-  apiKeys         SupplierApiKey[]
-  promotedListings PromotedListing[]
-  supportTickets  SupplierSupportTicket[]
-
-  @@map("suppliers")
 }
 
 enum ServiceType {
@@ -254,57 +1621,6 @@ enum ServiceStatus {
   SUSPENDED
 }
 
-model Service {
-  id               Int           @id @default(autoincrement())
-  supplierId       Int
-  type             ServiceType
-  name             String
-  slug             String        @unique
-  description      String?
-  shortDescription String?
-  price            Decimal
-  currency         String        @default("EUR")
-  capacity         Int?
-  duration         Int? // Duration in minutes
-  isActive         Boolean       @default(true)
-  status           ServiceStatus @default(DRAFT)
-  tags             String[]      @default([])
-  metadata         Json? // Service-specific data
-  translations     Json? // Multi-language content: { "hr": { "name": "", "description": "" }, "de": {...} }
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  // Relations
-  supplier             Supplier              @relation(fields: [supplierId], references: [id])
-  transportService     TransportService?
-  accommodationService AccommodationService?
-  tourService          TourService?
-  activityService      ActivityService?
-  bookingItems         BookingItem[]
-  reviews              Review[]
-  photos               Photo[]
-  favorites            Favorite[]
-  journeySegments      JourneySegment[]
-  packageItems         PackageItem[]
-  priceAlerts          PriceAlert[]
-  promotedListings     PromotedListing[]
-  userInteractions     UserInteraction[]
-  recommendationScores RecommendationScore[]
-  dynamicPricing       DynamicPricing[]
-
-  @@index([name])
-  @@index([type])
-  @@index([status])
-  @@index([isActive])
-  @@index([price])
-  @@index([capacity])
-  @@index([createdAt(sort: Desc)])
-  @@index([supplierId])
-  @@index([type, status, isActive])
-  @@index([price, type])
-  @@map("services")
-}
-
 enum TransportType {
   FERRY
   SPEEDBOAT
@@ -313,254 +1629,29 @@ enum TransportType {
   PRIVATE_TRANSFER
 }
 
-model TransportService {
-  id                  Int           @id @default(autoincrement())
-  serviceId           Int           @unique
-  transportType       TransportType
-  departureLocationId Int
-  arrivalLocationId   Int
-  departureTime       DateTime? // For scheduled services
-  arrivalTime         DateTime?
-  isScheduled         Boolean       @default(false)
-  vehicleCapacity     Int?
-  vehicleType         String?
-  amenities           String[]      @default([])
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  // Relations
-  service           Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  departureLocation Location @relation("DepartureLocation", fields: [departureLocationId], references: [id])
-  arrivalLocation   Location @relation("ArrivalLocation", fields: [arrivalLocationId], references: [id])
-  ferrySchedules    FerrySchedule[]
-  busSchedules      BusSchedule[]
-
-  @@map("transport_services")
-}
-
-// ============================================
-// BUS SCHEDULE INTEGRATION
-// ============================================
-
 enum BusOperator {
-  FLIXBUS        // International bus service
-  GETBYBUS       // Croatian bus aggregator
-  ARRIVA         // Regional bus operator
-  BRIONI_PULA    // Pula-Split-Dubrovnik line
-  CROATIABUS     // National bus company
-  PROMET_SPLIT   // Split local buses
+  FLIXBUS
+  GETBYBUS
+  ARRIVA
+  BRIONI_PULA
+  CROATIABUS
+  PROMET_SPLIT
   OTHER
 }
 
-model BusSchedule {
-  id                  Int            @id @default(autoincrement())
-  transportServiceId  Int?
-  operator            BusOperator
-  busNumber           String? // Bus line number
-  routeName           String // e.g., "Split Airport - Split Port"
-
-  // Locations
-  departureStopId     Int
-  arrivalStopId       Int
-
-  // Schedule
-  departureTime       DateTime
-  arrivalTime         DateTime
-  duration            Int // Duration in minutes
-
-  // Capacity & Availability
-  totalCapacity       Int // Total passenger capacity
-  availableSeats      Int @default(0)
-
-  // Pricing
-  adultPrice          Decimal
-  childPrice          Decimal?
-  seniorPrice         Decimal?
-  currency            String @default("EUR")
-
-  // Status
-  status              ScheduleStatus @default(SCHEDULED)
-
-  // Days of operation
-  operatingDays       String[] @default([]) // ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
-
-  // Seasonal operation
-  seasonStart         DateTime?
-  seasonEnd           DateTime?
-
-  // External API reference
-  externalId          String? // ID from external bus API
-  lastSyncedAt        DateTime?
-
-  // Metadata
-  amenities           String[] @default([]) // ["wifi", "ac", "toilet", "usb-charging"]
-  busType             String? // "Standard", "Premium", "Express"
-  notes               String? // Special notes
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  // Relations
-  transportService    TransportService? @relation(fields: [transportServiceId], references: [id])
-  departureStop       Location @relation("BusDeparture", fields: [departureStopId], references: [id])
-  arrivalStop         Location @relation("BusArrival", fields: [arrivalStopId], references: [id])
-  bookings            BusBooking[]
-
-  @@index([departureStopId, arrivalStopId, departureTime])
-  @@index([operator])
-  @@index([status])
-  @@index([departureTime])
-  @@map("bus_schedules")
-}
-
-model BusBooking {
-  id              Int           @id @default(autoincrement())
-  busScheduleId   Int
-  bookingId       Int // Reference to main booking
-
-  // Passenger details
-  adults          Int @default(1)
-  children        Int @default(0)
-  seniors         Int @default(0)
-
-  // Seat selection (optional)
-  seatNumbers     String[] @default([])
-
-  // Pricing
-  totalPrice      Decimal
-  currency        String @default("EUR")
-
-  // Booking reference from bus operator
-  operatorRef     String?
-
-  // Status
-  isConfirmed     Boolean @default(false)
-  isCancelled     Boolean @default(false)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  busSchedule     BusSchedule @relation(fields: [busScheduleId], references: [id])
-  booking         Booking @relation(fields: [bookingId], references: [id])
-
-  @@index([busScheduleId])
-  @@index([bookingId])
-  @@map("bus_bookings")
-}
-
-// ============================================
-// FERRY SCHEDULE INTEGRATION
-// ============================================
-
 enum FerryOperator {
-  JADROLINIJA  // National ferry company
-  KRILO        // Catamaran service
-  TP_LINE      // Private ferry operator
-  KAPETAN_LUKA // Hvar ferry service
+  JADROLINIJA
+  KRILO
+  TP_LINE
+  KAPETAN_LUKA
   OTHER
 }
 
 enum ScheduleStatus {
-  SCHEDULED    // Normal scheduled service
-  DELAYED      // Ferry delayed
-  CANCELLED    // Ferry cancelled
-  COMPLETED    // Ferry completed
-}
-
-model FerrySchedule {
-  id                  Int            @id @default(autoincrement())
-  transportServiceId  Int?
-  operator            FerryOperator
-  vesselName          String
-  routeName           String // e.g., "Split - Hvar"
-
-  // Locations
-  departurePortId     Int
-  arrivalPortId       Int
-
-  // Schedule
-  departureTime       DateTime
-  arrivalTime         DateTime
-  duration            Int // Duration in minutes
-
-  // Capacity & Availability
-  totalCapacity       Int // Total passenger capacity
-  vehicleCapacity     Int? // Number of vehicles/cars
-  availableSeats      Int @default(0)
-  availableVehicles   Int? @default(0)
-
-  // Pricing (per person)
-  adultPrice          Decimal
-  childPrice          Decimal?
-  vehiclePrice        Decimal?
-  currency            String @default("EUR")
-
-  // Status
-  status              ScheduleStatus @default(SCHEDULED)
-
-  // Days of operation
-  operatingDays       String[] @default([]) // ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
-
-  // Seasonal operation
-  seasonStart         DateTime?
-  seasonEnd           DateTime?
-
-  // External API reference
-  externalId          String? // ID from external ferry API
-  lastSyncedAt        DateTime?
-
-  // Metadata
-  amenities           String[] @default([]) // ["wifi", "restaurant", "air-conditioning"]
-  notes               String? // Special notes (e.g., "Weather dependent")
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  // Relations
-  transportService    TransportService? @relation(fields: [transportServiceId], references: [id])
-  departurePort       Location @relation("FerryDeparture", fields: [departurePortId], references: [id])
-  arrivalPort         Location @relation("FerryArrival", fields: [arrivalPortId], references: [id])
-  bookings            FerryBooking[]
-
-  @@index([departurePortId, arrivalPortId, departureTime])
-  @@index([operator])
-  @@index([status])
-  @@index([departureTime])
-  @@map("ferry_schedules")
-}
-
-model FerryBooking {
-  id              Int           @id @default(autoincrement())
-  ferryScheduleId Int
-  bookingId       Int // Reference to main booking
-
-  // Passenger details
-  adults          Int @default(1)
-  children        Int @default(0)
-  vehicles        Int @default(0)
-
-  // Pricing
-  totalPrice      Decimal
-  currency        String @default("EUR")
-
-  // Booking reference from ferry operator
-  operatorRef     String?
-
-  // Status
-  isConfirmed     Boolean @default(false)
-  isCancelled     Boolean @default(false)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  ferrySchedule   FerrySchedule @relation(fields: [ferryScheduleId], references: [id])
-  booking         Booking @relation(fields: [bookingId], references: [id])
-
-  @@index([ferryScheduleId])
-  @@index([bookingId])
-  @@map("ferry_bookings")
+  SCHEDULED
+  DELAYED
+  CANCELLED
+  COMPLETED
 }
 
 enum AccommodationType {
@@ -571,149 +1662,12 @@ enum AccommodationType {
   HOSTEL
 }
 
-model AccommodationService {
-  id                Int               @id @default(autoincrement())
-  serviceId         Int               @unique
-  locationId        Int
-  accommodationType AccommodationType
-  bedrooms          Int?
-  bathrooms         Int?
-  maxGuests         Int
-  amenities         String[]          @default([])
-  checkInTime       String?
-  checkOutTime      String?
-  minimumStay       Int? // Minimum nights
-  instantBook       Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-
-  // Relations
-  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id])
-
-  @@map("accommodation_services")
-}
-
-model TourService {
-  id                 Int      @id @default(autoincrement())
-  serviceId          Int      @unique
-  locationId         Int
-  tourType           String // Boat tour, walking tour, wine tour, etc.
-  meetingPoint       String?
-  includes           String[] @default([])
-  excludes           String[] @default([])
-  difficulty         String? // Easy, moderate, hard
-  languages          String[] @default(["en"])
-  groupSizeMax       Int?
-  cancellationPolicy String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  // Relations
-  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id])
-
-  @@map("tour_services")
-}
-
-model ActivityService {
-  id             Int      @id @default(autoincrement())
-  serviceId      Int      @unique
-  locationId     Int
-  activityType   String // Water sports, nightlife, dining, etc.
-  ageRestriction String?
-  equipment      String[] @default([])
-  skillLevel     String? // Beginner, intermediate, advanced
-  seasonality    String[] @default([]) // Months when available
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  // Relations
-  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id])
-
-  @@map("activity_services")
-}
-
-// ============================================
-// BOOKINGS & COMMERCE
-// ============================================
-
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
   REFUNDED
-}
-
-model Booking {
-  id                 Int           @id @default(autoincrement())
-  userId             Int
-  supplierId         Int
-  bookingReference   String        @unique @default(cuid())
-  status             BookingStatus @default(PENDING)
-  totalAmount        Decimal
-  currency           String        @default("EUR")
-  commission         Decimal       @default(0)
-  bookingDate        DateTime      @default(now())
-  serviceDate        DateTime
-  notes              String?
-  cancellationReason String?
-
-  // Group booking
-  isGroupBooking     Boolean       @default(false)
-  groupSize          Int?          // Number of people
-  groupCoordinator   String?       // Name of group coordinator
-  groupDiscount      Decimal?      // Discount percentage for groups
-
-  // Package booking
-  packageId          Int?          // Reference to package if part of one
-
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-
-  // Relations
-  user             User               @relation(fields: [userId], references: [id])
-  supplier         Supplier           @relation(fields: [supplierId], references: [id])
-  bookingItems     BookingItem[]
-  payments         Payment[]
-  review           Review?
-  conversations    Conversation[]
-  journeySegments  JourneySegment[]
-  ferryBookings    FerryBooking[]
-  busBookings      BusBooking[]
-  package          ServicePackage?    @relation(fields: [packageId], references: [id])
-  modifications    BookingModification[]
-  priceAlerts      PriceAlert[]       @relation("BookingAlerts")
-
-  @@index([serviceDate, status])
-  @@index([userId])
-  @@index([supplierId])
-  @@index([status])
-  @@index([isGroupBooking])
-  @@index([packageId])
-  @@map("bookings")
-}
-
-model BookingItem {
-  id         Int      @id @default(autoincrement())
-  bookingId  Int
-  serviceId  Int
-  quantity   Int      @default(1)
-  unitPrice  Decimal
-  totalPrice Decimal
-  metadata   Json? // Guest details, special requests
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id])
-
-  @@index([serviceId])
-  @@index([bookingId])
-  @@map("booking_items")
 }
 
 enum PaymentStatus {
@@ -730,376 +1684,36 @@ enum PaymentMethod {
   CASH
 }
 
-model Payment {
-  id              Int           @id @default(autoincrement())
-  bookingId       Int
-  amount          Decimal
-  currency        String        @default("EUR")
-  status          PaymentStatus @default(PENDING)
-  method          PaymentMethod
-  stripePaymentId String?
-  metadata        Json?
-  processedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id])
-
-  @@map("payments")
-}
-
-model Commission {
-  id               Int       @id @default(autoincrement())
-  supplierId       Int
-  amount           Decimal
-  rate             Float
-  bookingReference String
-  status           String    @default("pending") // pending, paid, disputed
-  paidAt           DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  // Relations
-  supplier Supplier @relation(fields: [supplierId], references: [id])
-
-  @@map("commissions")
-}
-
-// ============================================
-// CONTENT & DISCOVERY
-// ============================================
-
-model Event {
-  id           Int       @id @default(autoincrement())
-  locationId   Int
-  name         String
-  description  String?
-  startDate    DateTime
-  endDate      DateTime?
-  price        Decimal?
-  currency     String    @default("EUR")
-  maxAttendees Int?
-  category     String // Concert, festival, party, cultural
-  organizer    String?
-  website      String?
-  ticketUrl    String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id])
-  photos   Photo[]
-
-  @@map("events")
-}
-
-model Review {
-  id        Int      @id @default(autoincrement())
-  userId    Int // Reviewer (guest or supplier)
-  serviceId Int?
-  supplierId Int?
-  bookingId Int      @unique // Required - only completed bookings can be reviewed
-
-  // Binary rating system
-  reviewType       ReviewType // GUEST_TO_SUPPLIER or SUPPLIER_TO_GUEST
-  wouldRecommend   Boolean // 👍 true / 👎 false (wouldStayAgain for guests, wouldHostAgain for suppliers)
-  tag              String // ONE required tag describing experience
-
-  // 72h delayed publication
-  isPublished Boolean  @default(false)
-  publishAt   DateTime // Auto-publish after 72h
-
-  // Metadata
-  isVerified Boolean  @default(true) // Auto-verified for completed bookings
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  user     User      @relation(fields: [userId], references: [id])
-  service  Service?  @relation(fields: [serviceId], references: [id])
-  supplier Supplier? @relation("SupplierReviews", fields: [supplierId], references: [id])
-  booking  Booking   @relation(fields: [bookingId], references: [id])
-
-  @@index([serviceId, isPublished])
-  @@index([supplierId, isPublished])
-  @@index([reviewType])
-  @@index([publishAt])
-  @@map("reviews")
-}
-
-model Photo {
-  id         Int      @id @default(autoincrement())
-  serviceId  Int?
-  locationId Int?
-  eventId    Int?
-  url        String
-  altText    String?
-  caption    String?
-  sortOrder  Int      @default(0)
-  isMain     Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  service  Service?  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  event    Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@map("photos")
-}
-
-// ============================================
-// ANALYTICS & INTELLIGENCE
-// ============================================
-
-model DensityReading {
-  id         Int      @id @default(autoincrement())
-  locationId Int
-  density    Float // 0-1 scale (0 = empty, 1 = full capacity)
-  timestamp  DateTime @default(now())
-  source     String // "manual", "instagram", "google", "sensor"
-  metadata   Json? // Additional context data
-  createdAt  DateTime @default(now())
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id])
-
-  @@map("density_readings")
-}
-
-model TripItinerary {
-  id            Int      @id @default(autoincrement())
-  userId        Int
-  name          String
-  description   String?
-  startDate     DateTime
-  endDate       DateTime
-  totalBudget   Decimal?
-  currency      String   @default("EUR")
-  isAIGenerated Boolean  @default(false)
-  isPublic      Boolean  @default(false)
-  data          Json // Structured itinerary data
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  user           User              @relation(fields: [userId], references: [id])
-  sharedVersions SharedItinerary[]
-  stories        TravelStory[]
-
-  @@map("trip_itineraries")
-}
-
-// ============================================
-// FAVORITES/WISHLISTS
-// ============================================
-
-model Favorite {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  serviceId Int
-  createdAt DateTime @default(now())
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, serviceId])
-  @@index([userId])
-  @@index([serviceId])
-  @@index([createdAt(sort: Desc)])
-  @@map("favorites")
-}
-
-// ============================================
-// SYSTEM
-// ============================================
-
 enum NotificationType {
   BOOKING_CONFIRMATION
+  BOOKING_UPDATE
   PAYMENT_RECEIVED
   REVIEW_REQUEST
   DENSITY_ALERT
   PROMOTIONAL
+  MESSAGE
 }
-
-model Notification {
-  id        Int              @id @default(autoincrement())
-  userId    Int
-  type      NotificationType
-  title     String
-  message   String
-  isRead    Boolean          @default(false)
-  actionUrl String?
-  metadata  Json?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("notifications")
-}
-
-// ============================================
-// MESSAGING
-// ============================================
-
-model Conversation {
-  id               Int       @id @default(autoincrement())
-  guestId          Int
-  supplierId       Int
-  bookingId        Int? // Optional reference to booking context
-  lastMessageAt    DateTime  @default(now())
-  guestUnreadCount Int       @default(0)
-  supplierUnreadCount Int    @default(0)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  // Relations
-  guest    User     @relation("GuestConversations", fields: [guestId], references: [id])
-  supplier User     @relation("SupplierConversations", fields: [supplierId], references: [id])
-  booking  Booking? @relation(fields: [bookingId], references: [id])
-  messages Message[]
-
-  @@unique([guestId, supplierId, bookingId])
-  @@index([guestId])
-  @@index([supplierId])
-  @@index([lastMessageAt(sort: Desc)])
-  @@map("conversations")
-}
-
-model Message {
-  id             Int          @id @default(autoincrement())
-  conversationId Int
-  senderId       Int
-  content        String
-  isRead         Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  // Relations
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation(fields: [senderId], references: [id])
-
-  @@index([conversationId])
-  @@index([senderId])
-  @@index([createdAt(sort: Desc)])
-  @@map("messages")
-}
-
-// ============================================
-// MULTI-MODAL JOURNEY PLANNING
-// ============================================
 
 enum JourneyStatus {
-  PLANNING     // User is still planning the journey
-  READY        // Journey planned, ready to book
-  BOOKING      // Booking in progress
-  CONFIRMED    // All segments booked and confirmed
-  IN_PROGRESS  // Journey has started
-  COMPLETED    // Journey finished
-  CANCELLED    // Journey cancelled
+  PLANNING
+  READY
+  BOOKING
+  CONFIRMED
+  PENDING_CHANGES // When a supplier cancels a service in the journey
+  IN_PROGRESS
+  COMPLETED // Journey completed (past dates) - doesn't count toward 3 journey limit
+  CANCELLED
 }
 
 enum SegmentType {
-  AIRPORT_TRANSFER // Airport to port/city
-  FERRY            // Ferry between islands
-  TRANSPORT        // General transport (taxi, bus, etc.)
-  ACCOMMODATION    // Hotel/villa stay
-  ACTIVITY         // Activities during the journey
-  TOUR             // Guided tours
-  EVENT            // Event tickets
+  AIRPORT_TRANSFER
+  FERRY
+  TRANSPORT
+  ACCOMMODATION
+  ACTIVITY
+  TOUR
+  EVENT
 }
-
-model Journey {
-  id               Int           @id @default(autoincrement())
-  userId           Int
-  status           JourneyStatus @default(PLANNING)
-
-  // Journey details
-  name             String? // Optional name for the journey
-  originLocationId Int
-  destLocationId   Int
-  startDate        DateTime
-  endDate          DateTime
-
-  // Pricing
-  totalPrice       Decimal       @default(0)
-  currency         String        @default("EUR")
-
-  // Metadata
-  travelers        Int           @default(1) // Number of travelers
-  preferences      Json? // Travel preferences (budget, pace, interests)
-  optimizedRoute   Json? // Stored route optimization data
-
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  // Relations
-  user             User            @relation(fields: [userId], references: [id])
-  originLocation   Location        @relation("JourneyOrigin", fields: [originLocationId], references: [id])
-  destLocation     Location        @relation("JourneyDestination", fields: [destLocationId], references: [id])
-  segments         JourneySegment[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([startDate])
-  @@index([createdAt(sort: Desc)])
-  @@map("journeys")
-}
-
-model JourneySegment {
-  id                  Int         @id @default(autoincrement())
-  journeyId           Int
-  segmentType         SegmentType
-  segmentOrder        Int // Order in the journey (1, 2, 3...)
-
-  // Segment details
-  serviceId           Int? // Reference to Service if booked
-  bookingId           Int? // Reference to Booking when confirmed
-
-  // Location & Time
-  departureLocationId Int?
-  arrivalLocationId   Int?
-  departureTime       DateTime?
-  arrivalTime         DateTime?
-  duration            Int? // Duration in minutes
-
-  // Pricing
-  price               Decimal     @default(0)
-  currency            String      @default("EUR")
-
-  // Status
-  isBooked            Boolean     @default(false)
-  isConfirmed         Boolean     @default(false)
-
-  // Metadata
-  notes               String? // Special instructions or notes
-  metadata            Json? // Additional segment data (ferry company, vehicle type, etc.)
-
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
-
-  // Relations
-  journey             Journey     @relation(fields: [journeyId], references: [id], onDelete: Cascade)
-  service             Service?    @relation(fields: [serviceId], references: [id])
-  booking             Booking?    @relation(fields: [bookingId], references: [id])
-  departureLocation   Location?   @relation("SegmentDeparture", fields: [departureLocationId], references: [id])
-  arrivalLocation     Location?   @relation("SegmentArrival", fields: [arrivalLocationId], references: [id])
-
-  @@index([journeyId])
-  @@index([segmentOrder])
-  @@index([serviceId])
-  @@index([isBooked])
-  @@map("journey_segments")
-}
-
-// ============================================
-// AUDIT LOGS
-// ============================================
 
 enum AuditAction {
   CREATE
@@ -1120,42 +1734,12 @@ enum AuditAction {
   OTHER
 }
 
-model AuditLog {
-  id          Int         @id @default(autoincrement())
-  userId      Int? // Nullable for system actions
-  action      AuditAction
-  entity      String // e.g., "User", "Booking", "Service"
-  entityId    Int? // ID of the entity affected
-  description String? // Human-readable description
-  metadata    Json? // Additional context (previous/new values, IP address, etc.)
-  ipAddress   String?
-  userAgent   String?
-  endpoint    String? // API endpoint called
-  method      String? // HTTP method (GET, POST, etc.)
-  statusCode  Int? // HTTP status code
-  createdAt   DateTime    @default(now())
-
-  // Relations
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([action])
-  @@index([entity])
-  @@index([entityId])
-  @@index([createdAt(sort: Desc)])
-  @@map("audit_logs")
-}
-
-// ============================================
-// CROWD INTELLIGENCE SYSTEM
-// ============================================
-
 enum CrowdLevel {
-  EMPTY       // 0-20
-  QUIET       // 21-40
-  MODERATE    // 41-60
-  BUSY        // 61-80
-  VERY_BUSY   // 81-100
+  EMPTY
+  QUIET
+  MODERATE
+  BUSY
+  VERY_BUSY
 }
 
 enum DataSource {
@@ -1171,376 +1755,16 @@ enum DataSource {
   MANUAL
 }
 
-model CrowdDataPoint {
-  id         Int        @id @default(autoincrement())
-  locationId Int
-
-  // Crowd Index (0-100)
-  crowdIndex Float      // Final calculated crowd index
-  crowdLevel CrowdLevel // Human-readable level
-
-  // Individual data source scores
-  googleLiveScore     Float? // 0-100
-  googleHistoricScore Float? // 0-100
-  instagramScore      Float? // 0-100
-  tiktokScore         Float? // 0-100
-  weatherScore        Float? // 0-100
-  eventScore          Float? // 0-100
-  sensorScore         Float? // 0-100 (average of all sensors)
-
-  // Metadata
-  timestamp           DateTime @default(now())
-  isPrediction        Boolean  @default(false) // true for future predictions
-  predictionFor       DateTime? // For predictions
-  confidence          Float?   // Prediction confidence (0-1)
-
-  // Additional context
-  temperature         Float?
-  weatherCondition    String?
-  activeEvents        String[] @default([])
-  notes               String?
-
-  createdAt           DateTime @default(now())
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([locationId, timestamp])
-  @@index([locationId, isPrediction, predictionFor])
-  @@index([crowdLevel])
-  @@index([timestamp])
-  @@map("crowd_data_points")
-}
-
-model SocialTrend {
-  id         Int      @id @default(autoincrement())
-  locationId Int
-  platform   String   // "instagram", "tiktok"
-
-  // Metrics
-  postCount       Int      @default(0) // Posts in last hour
-  storyCount      Int      @default(0) // Stories (Instagram only)
-  hashtagVelocity Float    @default(0) // Hashtag usage rate
-  engagement      Float    @default(0) // Likes/comments/shares rate
-
-  // Hashtags tracked
-  hashtags   String[] @default([])
-
-  // Timing
-  timestamp  DateTime @default(now())
-  hourOfDay  Int      // 0-23
-  dayOfWeek  String   // MON, TUE, etc.
-
-  // Metadata
-  rawData    Json?    // Store raw API response
-
-  createdAt  DateTime @default(now())
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([locationId, platform, timestamp])
-  @@map("social_trends")
-}
-
-model WeatherSnapshot {
-  id               Int      @id @default(autoincrement())
-  locationId       Int
-
-  // Weather data
-  temperature      Float    // Celsius
-  feelsLike        Float?
-  humidity         Int?     // Percentage
-  uvIndex          Float?
-  windSpeed        Float?   // km/h
-  cloudCover       Int?     // Percentage
-  precipitation    Float?   // mm
-  weatherCondition String   // "sunny", "cloudy", "rainy", etc.
-
-  // Beach-specific
-  waveHeight       Float?   // meters
-  seaTemperature   Float?   // Celsius
-
-  // Timing
-  timestamp        DateTime @default(now())
-  forecastFor      DateTime? // For future forecasts
-
-  // Source
-  source           String   @default("openweathermap") // API source
-
-  createdAt        DateTime @default(now())
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([locationId, timestamp])
-  @@index([locationId, forecastFor])
-  @@map("weather_snapshots")
-}
-
-model Sensor {
-  id         Int      @id @default(autoincrement())
-  locationId Int
-
-  // Sensor details
-  sensorType String   // "wifi", "ble", "camera"
-  name       String
-  macAddress String?  @unique
-  ipAddress  String?
-
-  // Configuration
-  capacity   Int?     // Maximum capacity this sensor can detect
-  threshold  Float?   // Threshold for "busy" signal
-  isActive   Boolean  @default(true)
-
-  // Calibration
-  calibrationFactor Float @default(1.0) // Multiplier for accuracy
-  lastCalibrated    DateTime?
-
-  // Metadata
-  installDate DateTime?
-  location    String?  // Physical location description
-  metadata    Json?
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  locationRelation Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  readings         SensorReading[]
-
-  @@index([locationId, isActive])
-  @@index([sensorType])
-  @@map("sensors")
-}
-
-model SensorReading {
-  id        Int      @id @default(autoincrement())
-  sensorId  Int
-
-  // Reading data
-  count     Int      // Number of devices/people detected
-  rawValue  Float?   // Raw sensor value
-
-  // Timing
-  timestamp DateTime @default(now())
-
-  // Quality
-  confidence Float?  // Reading confidence (0-1)
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
-
-  @@index([sensorId, timestamp])
-  @@map("sensor_readings")
-}
-
-model CrowdPrediction {
-  id         Int      @id @default(autoincrement())
-  locationId Int
-
-  // Prediction
-  predictedIndex Float      // 0-100
-  predictedLevel CrowdLevel
-
-  // Timing
-  predictionFor  DateTime // When this prediction is for
-  generatedAt    DateTime @default(now())
-
-  // Model info
-  confidence     Float    // 0-1
-  modelVersion   String?  // ML model version used
-
-  // Factors
-  historicalPattern Float? // Historical average for this time
-  weatherImpact     Float? // Weather adjustment
-  eventImpact       Float? // Event impact
-  trendImpact       Float? // Social trend impact
-
-  // Best time recommendation
-  isBestTime     Boolean @default(false)
-
-  createdAt      DateTime @default(now())
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([locationId, predictionFor])
-  @@index([predictionFor])
-  @@map("crowd_predictions")
-}
-
-model BusinessProfile {
-  id         Int      @id @default(autoincrement())
-  supplierId Int      @unique
-  locationId Int
-
-  // Subscription tier
-  tier       String   @default("free") // free, basic, premium
-
-  // Featured placement
-  isFeatured Boolean  @default(false)
-  featuredUntil DateTime?
-
-  // Pricing
-  monthlyFee Decimal  @default(0)
-  cpcBid     Decimal? // Cost per click for promoted listings
-
-  // Analytics access
-  hasAnalytics Boolean @default(false)
-  hasAPI       Boolean @default(false)
-
-  // Dashboard settings
-  alertThreshold Float? // Crowd level to trigger alerts
-  notifyOnQuiet  Boolean @default(false) // Send "Not crowded now" promotions
-
-  // Metadata
-  dashboardData  Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id])
-
-  @@index([locationId, isFeatured])
-  @@index([tier])
-  @@map("business_profiles")
-}
-
-model CrowdAlert {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  locationId Int
-
-  // Alert config
-  alertType  String   // "threshold", "best_time", "event_spike"
-  threshold  Float?   // Crowd index threshold
-
-  // Triggered
-  isTriggered Boolean @default(false)
-  triggeredAt DateTime?
-
-  // Status
-  isActive   Boolean  @default(true)
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isActive])
-  @@index([locationId, isTriggered])
-  @@map("crowd_alerts")
-}
-
-// ============================================
-// ADVANCED BOOKING FEATURES
-// ============================================
-
 enum PackageStatus {
   ACTIVE
   INACTIVE
   SEASONAL
 }
 
-model ServicePackage {
-  id           Int           @id @default(autoincrement())
-  supplierId   Int
-  name         String
-  description  String?
-  packagePrice Decimal       // Discounted bundle price
-  regularPrice Decimal       // Sum of individual service prices
-  savings      Decimal       // Amount saved
-  currency     String        @default("EUR")
-  status       PackageStatus @default(ACTIVE)
-
-  // Availability
-  validFrom    DateTime?
-  validUntil   DateTime?
-  maxGuests    Int?
-  minGuests    Int           @default(1)
-
-  // Metadata
-  tags         String[]      @default([])
-  imageUrl     String?
-
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  // Relations
-  supplier     Supplier       @relation(fields: [supplierId], references: [id])
-  items        PackageItem[]
-  bookings     Booking[]
-
-  @@index([supplierId])
-  @@index([status])
-  @@map("service_packages")
-}
-
-model PackageItem {
-  id         Int     @id @default(autoincrement())
-  packageId  Int
-  serviceId  Int
-  quantity   Int     @default(1)
-  sortOrder  Int     @default(0)
-  isOptional Boolean @default(false)
-
-  createdAt  DateTime @default(now())
-
-  // Relations
-  package ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  service Service        @relation(fields: [serviceId], references: [id])
-
-  @@index([packageId])
-  @@index([serviceId])
-  @@map("package_items")
-}
-
 enum AlertType {
   PRICE_DROP
   AVAILABILITY
   SPECIAL_OFFER
-}
-
-model PriceAlert {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  serviceId   Int?
-  bookingId   Int?      // For monitoring existing booking prices
-
-  // Alert configuration
-  alertType   AlertType @default(PRICE_DROP)
-  targetPrice Decimal?  // Alert when price drops below this
-  percentage  Int?      // Alert when price drops by this percentage
-
-  // Search criteria (for flexible date searches)
-  startDate   DateTime?
-  endDate     DateTime?
-  guests      Int?
-
-  // Status
-  isActive    Boolean   @default(true)
-  isTriggered Boolean   @default(false)
-  triggeredAt DateTime?
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  booking Booking? @relation("BookingAlerts", fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isActive])
-  @@index([serviceId, isActive])
-  @@index([isTriggered])
-  @@map("price_alerts")
 }
 
 enum ModificationType {
@@ -1551,44 +1775,6 @@ enum ModificationType {
   SERVICE_REMOVAL
   CANCELLATION
 }
-
-model BookingModification {
-  id              Int              @id @default(autoincrement())
-  bookingId       Int
-  modificationType ModificationType
-
-  // Previous values
-  previousData    Json?            // Store previous booking state
-
-  // New values
-  newData         Json?            // Store new booking state
-
-  // Pricing
-  priceDifference Decimal?         // +/- amount
-  currency        String           @default("EUR")
-
-  // Status
-  status          String           @default("pending") // pending, approved, rejected
-  reason          String?          // Reason for modification
-
-  // Approval (for supplier approval)
-  approvedBy      Int?
-  approvedAt      DateTime?
-
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@index([status])
-  @@map("booking_modifications")
-}
-
-// ============================================
-// SUBSCRIPTION SYSTEM
-// ============================================
 
 enum SubscriptionTier {
   FREE
@@ -1606,43 +1792,12 @@ enum SubscriptionEventType {
   PAYMENT_FAILED
 }
 
-model SubscriptionEvent {
-  id             Int                   @id @default(autoincrement())
-  userId         Int
-  eventType      SubscriptionEventType
-  subscriptionId String? // Stripe subscription ID
-
-  // Event data
-  previousTier   String?
-  newTier        String?
-  amount         Decimal?
-  currency       String                @default("EUR")
-
-  // Metadata
-  metadata       Json?
-  stripeEventId  String? // Stripe event ID for idempotency
-
-  createdAt      DateTime              @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([eventType])
-  @@index([stripeEventId])
-  @@map("subscription_events")
-}
-
-// ============================================
-// SUPPLIER PREMIUM ADD-ONS
-// ============================================
-
 enum SupplierAddonType {
-  ANALYTICS_PRO       // €29/month - Advanced analytics dashboard
-  API_ACCESS          // €49/month - REST API for integrations
-  MARKETING_SUITE     // €39/month - Promoted listings, featured badges
-  COMMISSION_REDUCTION // €99/month - Reduce commission from 15% to 10%
-  PRIORITY_SUPPORT    // €19/month - Dedicated support channel
+  ANALYTICS_PRO
+  API_ACCESS
+  MARKETING_SUITE
+  COMMISSION_REDUCTION
+  PRIORITY_SUPPORT
 }
 
 enum AddonStatus {
@@ -1652,362 +1807,11 @@ enum AddonStatus {
   TRIAL
 }
 
-model SupplierAddon {
-  id              Int               @id @default(autoincrement())
-  supplierId      Int
-  addonType       SupplierAddonType
-  status          AddonStatus       @default(ACTIVE)
-
-  // Pricing
-  monthlyPrice    Decimal
-  currency        String            @default("EUR")
-
-  // Stripe
-  stripeSubscriptionId String?      @unique
-  stripePriceId   String?
-
-  // Dates
-  startDate       DateTime          @default(now())
-  endDate         DateTime?
-  trialEndsAt     DateTime?
-  cancelAtPeriodEnd Boolean         @default(false)
-
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  // Relations
-  supplier        Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-
-  @@index([supplierId])
-  @@index([addonType])
-  @@index([status])
-  @@map("supplier_addons")
-}
-
-model SupplierApiKey {
-  id          Int      @id @default(autoincrement())
-  supplierId  Int
-  name        String   // User-friendly name for the key
-  keyHash     String   @unique // Hashed API key
-  keyPreview  String   // Last 4 characters for display
-  isActive    Boolean  @default(true)
-  lastUsedAt  DateTime?
-  expiresAt   DateTime?
-
-  // Rate limiting
-  requestCount Int      @default(0)
-  rateLimit    Int      @default(1000) // Requests per hour
-
-  // Scopes/permissions
-  scopes      String[] @default([]) // e.g., ["bookings:read", "services:write"]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-
-  @@index([supplierId])
-  @@index([keyHash])
-  @@index([isActive])
-  @@map("supplier_api_keys")
-}
-
-model PromotedListing {
-  id          Int      @id @default(autoincrement())
-  serviceId   Int
-  supplierId  Int
-
-  // Promotion details
-  startDate   DateTime
-  endDate     DateTime
-  position    Int?     // Priority position (lower = higher priority)
-  isFeatured  Boolean  @default(false) // Featured badge
-  boostedScore Float   @default(1.0) // Boost factor for search ranking
-
-  // Budget & billing
-  dailyBudget Decimal?
-  totalSpent  Decimal  @default(0)
-  impressions Int      @default(0)
-  clicks      Int      @default(0)
-  bookings    Int      @default(0)
-
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-
-  @@index([serviceId])
-  @@index([supplierId])
-  @@index([isActive])
-  @@index([startDate, endDate])
-  @@map("promoted_listings")
-}
-
-model SupplierSupportTicket {
-  id          Int      @id @default(autoincrement())
-  supplierId  Int
-  subject     String
-  description String
-  status      String   @default("open") // open, in_progress, resolved, closed
-  priority    String   @default("normal") // low, normal, high, urgent
-  category    String? // technical, billing, account, general
-
-  // Priority support flag
-  isPriority  Boolean  @default(false)
-
-  assignedTo  Int?     // Admin user ID
-  resolvedAt  DateTime?
-  resolvedBy  Int?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  messages    SupplierSupportMessage[]
-
-  @@index([supplierId])
-  @@index([status])
-  @@index([priority])
-  @@index([isPriority])
-  @@map("supplier_support_tickets")
-}
-
-model SupplierSupportMessage {
-  id        Int      @id @default(autoincrement())
-  ticketId  Int
-  userId    Int?     // User who sent message (supplier or admin)
-  message   String
-  isInternal Boolean @default(false) // Internal notes visible only to admins
-
-  attachments String[] @default([])
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  ticket    SupplierSupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@index([ticketId])
-  @@map("supplier_support_messages")
-}
-
-// ============================================
-// SOCIAL & SHARING FEATURES
-// ============================================
-
 enum ShareVisibility {
   PUBLIC
   FRIENDS_ONLY
   PRIVATE
 }
-
-model SharedItinerary {
-  id              Int             @id @default(autoincrement())
-  itineraryId     Int
-  sharedBy        Int             // User who shared
-  visibility      ShareVisibility @default(PUBLIC)
-
-  // Sharing stats
-  views           Int             @default(0)
-  likes           Int             @default(0)
-  forks           Int             @default(0) // How many people copied this itinerary
-
-  // Social description
-  title           String?
-  description     String?
-  coverPhoto      String?
-  tags            String[]        @default([])
-
-  // Collaborative features
-  allowCollaboration Boolean      @default(false)
-  collaborators   Int[]           @default([]) // User IDs who can edit
-
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  // Relations
-  itinerary       TripItinerary   @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
-  owner           User            @relation("SharedItineraryOwner", fields: [sharedBy], references: [id])
-  comments        ItineraryComment[]
-  likes_users     ItineraryLike[]
-
-  @@index([sharedBy])
-  @@index([visibility])
-  @@index([isActive])
-  @@map("shared_itineraries")
-}
-
-model ItineraryComment {
-  id                Int              @id @default(autoincrement())
-  sharedItineraryId Int
-  userId            Int
-  comment           String
-  parentId          Int?             // For nested comments
-
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  // Relations
-  sharedItinerary   SharedItinerary  @relation(fields: [sharedItineraryId], references: [id], onDelete: Cascade)
-  user              User             @relation(fields: [userId], references: [id])
-  parent            ItineraryComment? @relation("CommentReplies", fields: [parentId], references: [id])
-  replies           ItineraryComment[] @relation("CommentReplies")
-
-  @@index([sharedItineraryId])
-  @@index([userId])
-  @@map("itinerary_comments")
-}
-
-model ItineraryLike {
-  id                Int             @id @default(autoincrement())
-  sharedItineraryId Int
-  userId            Int
-  createdAt         DateTime        @default(now())
-
-  // Relations
-  sharedItinerary   SharedItinerary @relation(fields: [sharedItineraryId], references: [id], onDelete: Cascade)
-  user              User            @relation(fields: [userId], references: [id])
-
-  @@unique([sharedItineraryId, userId])
-  @@index([userId])
-  @@map("itinerary_likes")
-}
-
-model TravelStory {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  title       String
-  content     String
-  locationId  Int?
-
-  // Trip reference
-  itineraryId Int?
-  bookingId   Int?
-
-  // Media
-  photos      String[] @default([])
-  coverPhoto  String?
-
-  // Social
-  visibility  ShareVisibility @default(PUBLIC)
-  tags        String[] @default([])
-  views       Int      @default(0)
-  likes       Int      @default(0)
-
-  // Moderation
-  isPublished Boolean  @default(true)
-  publishedAt DateTime @default(now())
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  user        User     @relation(fields: [userId], references: [id])
-  location    Location? @relation(fields: [locationId], references: [id])
-  itinerary   TripItinerary? @relation(fields: [itineraryId], references: [id])
-  comments    StoryComment[]
-  likes_users StoryLike[]
-
-  @@index([userId])
-  @@index([locationId])
-  @@index([visibility])
-  @@index([publishedAt])
-  @@map("travel_stories")
-}
-
-model StoryComment {
-  id        Int      @id @default(autoincrement())
-  storyId   Int
-  userId    Int
-  comment   String
-  parentId  Int?
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  story     TravelStory    @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  user      User           @relation(fields: [userId], references: [id])
-  parent    StoryComment?  @relation("StoryReplies", fields: [parentId], references: [id])
-  replies   StoryComment[] @relation("StoryReplies")
-
-  @@index([storyId])
-  @@index([userId])
-  @@map("story_comments")
-}
-
-model StoryLike {
-  id        Int      @id @default(autoincrement())
-  storyId   Int
-  userId    Int
-  createdAt DateTime @default(now())
-
-  // Relations
-  story     TravelStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id])
-
-  @@unique([storyId, userId])
-  @@index([userId])
-  @@map("story_likes")
-}
-
-model Friendship {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  friendId   Int
-  status     String   @default("pending") // pending, accepted, blocked
-  requestedBy Int     // Who sent the friend request
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  user       User     @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
-  friend     User     @relation("FriendFriendships", fields: [friendId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, friendId])
-  @@index([userId])
-  @@index([friendId])
-  @@index([status])
-  @@map("friendships")
-}
-
-model UserActivity {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  activityType String  // booked, reviewed, shared_itinerary, posted_story, liked, etc.
-
-  // References
-  bookingId   Int?
-  itineraryId Int?
-  storyId     Int?
-  serviceId   Int?
-
-  // Activity details
-  metadata    Json?
-
-  // Privacy
-  visibility  ShareVisibility @default(PUBLIC)
-
-  createdAt   DateTime @default(now())
-
-  // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([activityType])
-  @@index([createdAt])
-  @@index([visibility])
-  @@map("user_activities")
-}
-
-// ============================================
-// AI & PERSONALIZATION
-// ============================================
 
 enum TravelStyle {
   LUXURY
@@ -2034,233 +1838,18 @@ enum InterestCategory {
   PHOTOGRAPHY
 }
 
-model UserPreferences {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @unique
-
-  // Travel preferences
-  travelStyles    TravelStyle[]     @default([])
-  interests       InterestCategory[] @default([])
-
-  // Budget preferences
-  minBudget       Decimal?
-  maxBudget       Decimal?
-  currency        String            @default("EUR")
-
-  // Accommodation preferences
-  preferredStarRating Int?          // 1-5
-  preferredAmenities  String[]      @default([])
-
-  // Activity preferences
-  activityLevelMin Int?             // 1-5 (1=relaxed, 5=intense)
-  activityLevelMax Int?
-  preferredDuration String?         // "half-day", "full-day", "multi-day"
-
-  // Location preferences
-  preferredRegions String[]         @default([])
-  avoidCrowds      Boolean          @default(false)
-
-  // AI learning data
-  bookingHistory   Json?            // Aggregated booking patterns
-  clickPatterns    Json?            // Services user clicks on
-  searchHistory    Json?            // Common searches
-
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  // Relations
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("user_preferences")
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
 }
 
-model UserInteraction {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  serviceId   Int
-  interactionType String  // "view", "click", "like", "save", "book", "review"
-
-  // Context
-  searchQuery String?
-  referrer    String?
-  duration    Int?             // Time spent viewing (seconds)
-
-  // Metadata
-  metadata    Json?
-
-  createdAt   DateTime @default(now())
-
-  // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([serviceId])
-  @@index([interactionType])
-  @@index([createdAt])
-  @@map("user_interactions")
-}
-
-model RecommendationScore {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  serviceId   Int
-
-  // Scoring components
-  preferenceScore   Decimal  @default(0)  // Based on user preferences (0-1)
-  behaviorScore     Decimal  @default(0)  // Based on user behavior (0-1)
-  popularityScore   Decimal  @default(0)  // Based on overall popularity (0-1)
-  seasonalScore     Decimal  @default(0)  // Based on seasonality (0-1)
-  proximityScore    Decimal  @default(0)  // Based on user's location/saved places (0-1)
-
-  // Final score
-  totalScore        Decimal  @default(0)  // Weighted average (0-1)
-
-  // Explanation
-  reasoning         String?              // Why this was recommended
-
-  // Freshness
-  computedAt        DateTime @default(now())
-  expiresAt         DateTime             // When to recompute
-
-  // Relations
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service           Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, serviceId])
-  @@index([userId])
-  @@index([totalScore])
-  @@index([expiresAt])
-  @@map("recommendation_scores")
-}
-
-model SmartSuggestion {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-
-  // Suggestion type
-  suggestionType String   // "weekend_getaway", "similar_to_saved", "trending_nearby", "hidden_gem", etc.
-
-  // Content
-  title       String
-  description String
-
-  // Services included
-  serviceIds  Int[]    @default([])
-
-  // Metadata
-  reasoning   String?  // Why this suggestion was generated
-  priority    Int      @default(0) // Higher = more important
-
-  // Validity
-  validFrom   DateTime @default(now())
-  validUntil  DateTime
-
-  // User feedback
-  viewed      Boolean  @default(false)
-  clicked     Boolean  @default(false)
-  dismissed   Boolean  @default(false)
-
-  createdAt   DateTime @default(now())
-
-  // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([suggestionType])
-  @@index([validUntil])
-  @@index([priority])
-  @@map("smart_suggestions")
-}
-
-model ChatConversation {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-
-  // Conversation metadata
-  title       String?              // Auto-generated or user-set
-  context     String?              // "booking_help", "recommendations", "support", etc.
-
-  // Status
-  isActive    Boolean  @default(true)
-  lastMessageAt DateTime @default(now())
-
-  // Summary (for quick context loading)
-  summary     String?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages    ChatMessage[]
-
-  @@index([userId])
-  @@index([isActive])
-  @@index([lastMessageAt])
-  @@map("chat_conversations")
-}
-
-model ChatMessage {
-  id              Int      @id @default(autoincrement())
-  conversationId  Int
-
-  // Message content
-  role            String   // "user", "assistant", "system"
-  content         String
-
-  // AI metadata
-  model           String?  // Which AI model was used
-  tokens          Int?     // Token count
-
-  // Context
-  attachments     Json?    // Links, images, services referenced
-
-  createdAt       DateTime @default(now())
-
-  // Relations
-  conversation    ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId])
-  @@index([createdAt])
-  @@map("chat_messages")
-}
-
-model DynamicPricing {
-  id          Int      @id @default(autoincrement())
-  serviceId   Int
-
-  // Date range
-  startDate   DateTime
-  endDate     DateTime
-
-  // Pricing factors
-  basePrice       Decimal
-  demandMultiplier Decimal  @default(1.0)  // Based on demand (0.8 - 2.0)
-  seasonalMultiplier Decimal @default(1.0) // Based on season
-  crowdMultiplier Decimal  @default(1.0)   // Based on crowd predictions
-
-  // Final price
-  suggestedPrice  Decimal
-  minPrice        Decimal                  // Floor price
-  maxPrice        Decimal                  // Ceiling price
-
-  // Confidence
-  confidence      Decimal  @default(0.5)   // How confident the AI is (0-1)
-
-  // Applied
-  isActive        Boolean  @default(false)
-  appliedAt       DateTime?
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  service         Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  @@index([serviceId])
-  @@index([startDate, endDate])
-  @@index([isActive])
-  @@map("dynamic_pricing")
+enum DisputeType {
+  PAYMENT_ISSUE
+  SERVICE_NOT_PROVIDED
+  CANCELLATION
+  DAMAGE_CLAIM
+  HARASSMENT
+  OTHER
 }

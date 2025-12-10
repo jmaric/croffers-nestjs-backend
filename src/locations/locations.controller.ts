@@ -42,6 +42,18 @@ export class LocationsController {
     return this.locationsService.findAll(filterDto);
   }
 
+  @Get('service-locations')
+  @UseInterceptors(HttpCacheInterceptor)
+  @ApiOperation({
+    summary: 'Get service locations only (islands and cities)',
+    description: 'Returns only top-level locations used for service filtering'
+  })
+  getServiceLocations(@Query() query: { page?: string; limit?: string }) {
+    const page = query.page ? parseInt(query.page, 10) : undefined;
+    const limit = query.limit ? parseInt(query.limit, 10) : undefined;
+    return this.locationsService.getServiceLocations(page, limit);
+  }
+
   @Get('slug/:slug')
   @UseInterceptors(HttpCacheInterceptor)
   findBySlug(@Param('slug') slug: string) {

@@ -3,8 +3,13 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   CreateServiceDto,
   UpdateServiceDto,
@@ -27,7 +32,12 @@ import { getTranslatedContent, getTranslatedArray } from '../common/helpers/tran
 
 @Injectable()
 export class ServicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Apply translations to a service object based on requested language
@@ -75,18 +85,37 @@ export class ServicesService {
     }
 
     // Create service based on type
+    let createdService;
     switch (serviceType) {
       case ServiceType.TRANSPORT:
-        return this.createTransportService(supplier.id, dto as CreateTransportServiceDto);
+        createdService = await this.createTransportService(supplier.id, dto as CreateTransportServiceDto);
+        break;
       case ServiceType.ACCOMMODATION:
-        return this.createAccommodationService(supplier.id, dto as CreateAccommodationServiceDto);
+        createdService = await this.createAccommodationService(supplier.id, dto as CreateAccommodationServiceDto);
+        break;
       case ServiceType.TOUR:
-        return this.createTourService(supplier.id, dto as CreateTourServiceDto);
+        createdService = await this.createTourService(supplier.id, dto as CreateTourServiceDto);
+        break;
       case ServiceType.ACTIVITY:
-        return this.createActivityService(supplier.id, dto as CreateActivityServiceDto);
+        createdService = await this.createActivityService(supplier.id, dto as CreateActivityServiceDto);
+        break;
       default:
         throw new BadRequestException('Invalid service type');
     }
+
+    // Invalidate cache for services list so the new service appears immediately
+    await this.invalidateServicesCache(userId, supplier.id);
+
+    // Notify all admins about new service pending approval
+    await this.notificationsService.notifyAllAdmins(
+      'SYSTEM_ALERT' as any, // Using SYSTEM_ALERT for admin notifications
+      'New Service Pending Approval',
+      `A new ${serviceType.toLowerCase()} service "${dto.service.name}" has been submitted by ${supplier.businessName} and requires approval.`,
+      `/admin/dashboard?tab=services`,
+      { serviceId: createdService.id, serviceName: dto.service.name, supplierId: supplier.id },
+    );
+
+    return createdService;
   }
 
   private async createTransportService(
@@ -263,6 +292,8 @@ export class ServicesService {
       latitude,
       longitude,
       radius,
+      locationId,
+      locationName,
       minCapacity,
       startDate,
       endDate,
@@ -281,14 +312,63 @@ export class ServicesService {
     if (isActive !== undefined) where.isActive = isActive;
     if (supplierId) where.supplierId = supplierId;
 
+    // Build AND conditions for complex OR queries
+    const andConditions: any[] = [];
+
     // Full-text search
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
-        { tags: { hasSome: search.split(' ') } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { shortDescription: { contains: search, mode: 'insensitive' } },
+          { tags: { hasSome: search.split(' ') } },
+        ],
+      });
+    }
+
+    // Location filtering (by ID or name)
+    if (locationId || locationName) {
+      const locationCondition = locationId
+        ? { id: locationId }
+        : { name: { contains: locationName, mode: 'insensitive' } };
+
+      andConditions.push({
+        OR: [
+          // Accommodation services
+          {
+            accommodationService: {
+              location: locationCondition,
+            },
+          },
+          // Tour services
+          {
+            tourService: {
+              location: locationCondition,
+            },
+          },
+          // Activity services
+          {
+            activityService: {
+              location: locationCondition,
+            },
+          },
+          // Transport services (departure OR arrival location)
+          {
+            transportService: {
+              OR: [
+                { departureLocation: locationCondition },
+                { arrivalLocation: locationCondition },
+              ],
+            },
+          },
+        ],
+      });
+    }
+
+    // Apply AND conditions if any exist
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     // Price range
@@ -336,6 +416,18 @@ export class ServicesService {
             bookingItems: true,
           },
         },
+        bookingItems: supplierId
+          ? {
+              select: {
+                totalPrice: true,
+                booking: {
+                  select: {
+                    status: true,
+                  },
+                },
+              },
+            }
+          : false,
         accommodationService: {
           select: {
             locationId: true,
@@ -366,6 +458,28 @@ export class ServicesService {
           select: {
             locationId: true,
             location: {
+              select: {
+                id: true,
+                name: true,
+                latitude: true,
+                longitude: true,
+              },
+            },
+          },
+        },
+        transportService: {
+          select: {
+            departureLocationId: true,
+            arrivalLocationId: true,
+            departureLocation: {
+              select: {
+                id: true,
+                name: true,
+                latitude: true,
+                longitude: true,
+              },
+            },
+            arrivalLocation: {
               select: {
                 id: true,
                 name: true,
@@ -431,18 +545,44 @@ export class ServicesService {
     const total = await this.prisma.service.count({ where });
     const filteredTotal = services.length;
 
+    // Calculate bookings count, revenue, and trust score
+    if (supplierId) {
+      services = await Promise.all(
+        services.map(async (service) => {
+          const bookingsCount = service._count.bookingItems;
+          const revenue = service.bookingItems
+            ? service.bookingItems.reduce((sum, item) => {
+                // Use the item's totalPrice (converted from Decimal to number)
+                return sum + Number(item.totalPrice || 0);
+              }, 0)
+            : 0;
+
+          // Calculate trust score
+          const trustScoreData = await this.calculateServiceTrustScore(
+            service.id,
+          );
+
+          // Remove bookingItems from response and add calculated fields
+          const { bookingItems, ...serviceWithoutItems } = service;
+          return {
+            ...serviceWithoutItems,
+            bookings: bookingsCount,
+            revenue,
+            trustScore: trustScoreData,
+          } as any;
+        }),
+      ) as any;
+    }
+
     // Apply translations to all services
     const translatedServices = this.applyTranslationsToArray(services, lang);
 
     return {
       data: translatedServices,
-      meta: {
-        total: filteredTotal,
-        originalTotal: total,
-        page,
-        limit,
-        totalPages: Math.ceil(filteredTotal / limit),
-      },
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -836,6 +976,8 @@ export class ServicesService {
   }
 
   async remove(id: number, userId: number, userRole: UserRole) {
+    console.log('[DELETE] Attempting to delete service:', { id, userId, userRole });
+
     const service = await this.prisma.service.findUnique({
       where: { id },
       include: {
@@ -848,7 +990,15 @@ export class ServicesService {
       },
     });
 
+    console.log('[DELETE] Service found:', service ? {
+      id: service.id,
+      supplierId: service.supplierId,
+      supplierUserId: service.supplier?.userId,
+      status: service.status
+    } : null);
+
     if (!service) {
+      console.log('[DELETE] Service not found, throwing 404');
       throw new NotFoundException(`Service with ID ${id} not found`);
     }
 
@@ -868,9 +1018,57 @@ export class ServicesService {
       where: { id },
     });
 
+    // Invalidate cache for services list
+    await this.invalidateServicesCache(userId, service.supplierId);
+
     return {
       message: 'Service deleted successfully',
     };
+  }
+
+  /**
+   * Invalidate HTTP cache for services endpoints
+   * This clears cached GET /services responses so they reflect the latest data
+   */
+  private async invalidateServicesCache(userId: number, supplierId: number) {
+    try {
+      // Get all cache keys that start with http-cache and contain /services
+      // Since in-memory cache doesn't support pattern deletion, we'll clear specific known patterns
+      const cacheKeys = [
+        `http-cache:${userId}:/api/v1/services`,
+        `http-cache:${userId}:/services`,
+      ];
+
+      // Try all common query parameter combinations
+      const queryVariations = [
+        '',
+        `?supplierId=${supplierId}`,
+        `?supplierId=${supplierId}&page=1`,
+        `?supplierId=${supplierId}&page=1&limit=10`,
+        `?supplierId=${supplierId}&page=1&limit=20`,
+        `?supplierId=${supplierId}&limit=10`,
+        `?supplierId=${supplierId}&limit=20`,
+        `?page=1&limit=10`,
+        `?page=1&limit=20`,
+      ];
+
+      // Add page 2, 3, 4, 5 variations
+      for (let page = 2; page <= 5; page++) {
+        queryVariations.push(`?supplierId=${supplierId}&page=${page}&limit=10`);
+        queryVariations.push(`?page=${page}&limit=10`);
+      }
+
+      for (const baseKey of cacheKeys) {
+        for (const query of queryVariations) {
+          await this.cacheManager.del(`${baseKey}${query}`);
+        }
+      }
+
+      console.log(`[Cache] Invalidated services cache for user ${userId}, supplier ${supplierId}`);
+    } catch (error) {
+      console.error('[Cache] Failed to invalidate cache:', error);
+      // Don't throw - cache invalidation failure shouldn't break the operation
+    }
   }
 
   async checkAvailability(serviceId: number, date: string, requestedQuantity: number) {

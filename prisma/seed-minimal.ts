@@ -1,7 +1,7 @@
-import { PrismaClient } from '../generated/prisma/client/client.ts';
+import { PrismaClient } from '../generated/prisma/client/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import * as bcrypt from 'bcrypt';
+import * as argon from 'argon2';
 import 'dotenv/config';
 
 const pool = new Pool({
@@ -14,12 +14,14 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Seeding database with test data...\n');
 
-  const hash = await bcrypt.hash('password123', 10);
+  const hash = await argon.hash('password123');
 
   // 1. Admin
   await prisma.user.upsert({
     where: { email: 'admin@croffers.com' },
-    update: {},
+    update: {
+      hash, // Update the password hash if user already exists
+    },
     create: {
       email: 'admin@croffers.com',
       hash,
@@ -35,7 +37,9 @@ async function main() {
   // 2. Premium Tourist
   await prisma.user.upsert({
     where: { email: 'john@example.com' },
-    update: {},
+    update: {
+      hash, // Update the password hash if user already exists
+    },
     create: {
       email: 'john@example.com',
       hash,
@@ -55,7 +59,9 @@ async function main() {
   // 3. Free Tourist
   await prisma.user.upsert({
     where: { email: 'sarah@example.com' },
-    update: {},
+    update: {
+      hash, // Update the password hash if user already exists
+    },
     create: {
       email: 'sarah@example.com',
       hash,
@@ -72,7 +78,9 @@ async function main() {
   // 4. Supplier
   const supplierUser = await prisma.user.upsert({
     where: { email: 'supplier@example.com' },
-    update: {},
+    update: {
+      hash, // Update the password hash if user already exists
+    },
     create: {
       email: 'supplier@example.com',
       hash,
@@ -132,12 +140,170 @@ async function main() {
 
   console.log('✅ Locations (Dubrovnik, Split)');
 
+  // 6. Services with Location Relations
+  const supplierRecord = await prisma.supplier.findFirst({
+    where: { userId: supplierUser.id },
+  });
+
+  const dubrovnikLocation = await prisma.location.findUnique({
+    where: { slug: 'dubrovnik' },
+  });
+
+  const splitLocation = await prisma.location.findUnique({
+    where: { slug: 'split' },
+  });
+
+  if (supplierRecord && dubrovnikLocation && splitLocation) {
+    // Accommodation in Dubrovnik
+    const accommodation1 = await prisma.service.upsert({
+      where: { slug: 'luxury-villa-dubrovnik' },
+      update: {},
+      create: {
+        supplierId: supplierRecord.id,
+        type: 'ACCOMMODATION',
+        name: 'Luxury Villa Dubrovnik Old Town',
+        slug: 'luxury-villa-dubrovnik',
+        description:
+          'Beautiful luxury villa in the heart of Dubrovnik Old Town with stunning sea views',
+        shortDescription: 'Luxury villa with sea views',
+        price: 250,
+        currency: 'EUR',
+        capacity: 6,
+        isActive: true,
+        status: 'ACTIVE',
+        tags: ['luxury', 'sea-view', 'old-town'],
+        accommodationService: {
+          create: {
+            locationId: dubrovnikLocation.id,
+            accommodationType: 'VILLA',
+            bedrooms: 3,
+            bathrooms: 2,
+            maxGuests: 6,
+            amenities: ['WiFi', 'Air Conditioning', 'Sea View', 'Kitchen'],
+            checkInTime: '15:00',
+            checkOutTime: '11:00',
+            minimumStay: 2,
+            instantBook: true,
+          },
+        },
+      },
+    });
+
+    // Tour in Split
+    const tour1 = await prisma.service.upsert({
+      where: { slug: 'split-city-walking-tour' },
+      update: {},
+      create: {
+        supplierId: supplierRecord.id,
+        type: 'TOUR',
+        name: 'Split City Walking Tour',
+        slug: 'split-city-walking-tour',
+        description:
+          'Explore the historic Diocletian\'s Palace and Split\'s old town with a local guide',
+        shortDescription: 'Guided walking tour of Split',
+        price: 35,
+        currency: 'EUR',
+        capacity: 15,
+        duration: 120,
+        isActive: true,
+        status: 'ACTIVE',
+        tags: ['walking', 'history', 'cultural'],
+        tourService: {
+          create: {
+            locationId: splitLocation.id,
+            tourType: 'Walking Tour',
+            meetingPoint: 'Diocletian\'s Palace - Golden Gate',
+            includes: ['Professional guide', 'Entry to palace cellars'],
+            excludes: ['Food and drinks', 'Hotel pickup'],
+            difficulty: 'Easy',
+            languages: ['en', 'hr', 'de'],
+            groupSizeMax: 15,
+            cancellationPolicy: 'Free cancellation up to 24 hours before',
+          },
+        },
+      },
+    });
+
+    // Accommodation in Split
+    const accommodation2 = await prisma.service.upsert({
+      where: { slug: 'modern-apartment-split' },
+      update: {},
+      create: {
+        supplierId: supplierRecord.id,
+        type: 'ACCOMMODATION',
+        name: 'Modern Apartment Split Center',
+        slug: 'modern-apartment-split',
+        description: 'Stylish modern apartment in the center of Split, 5 minutes walk to the beach',
+        shortDescription: 'Modern apartment near beach',
+        price: 120,
+        currency: 'EUR',
+        capacity: 4,
+        isActive: true,
+        status: 'ACTIVE',
+        tags: ['modern', 'city-center', 'beach'],
+        accommodationService: {
+          create: {
+            locationId: splitLocation.id,
+            accommodationType: 'APARTMENT',
+            bedrooms: 2,
+            bathrooms: 1,
+            maxGuests: 4,
+            amenities: ['WiFi', 'Air Conditioning', 'Washing Machine', 'Parking'],
+            checkInTime: '14:00',
+            checkOutTime: '10:00',
+            minimumStay: 1,
+            instantBook: false,
+          },
+        },
+      },
+    });
+
+    // Activity in Dubrovnik
+    const activity1 = await prisma.service.upsert({
+      where: { slug: 'dubrovnik-sea-kayaking' },
+      update: {},
+      create: {
+        supplierId: supplierRecord.id,
+        type: 'ACTIVITY',
+        name: 'Dubrovnik Sea Kayaking Adventure',
+        slug: 'dubrovnik-sea-kayaking',
+        description:
+          'Paddle around the Dubrovnik city walls and explore hidden caves and beaches',
+        shortDescription: 'Sea kayaking around city walls',
+        price: 55,
+        currency: 'EUR',
+        capacity: 10,
+        duration: 180,
+        isActive: true,
+        status: 'ACTIVE',
+        tags: ['adventure', 'water-sports', 'outdoor'],
+        activityService: {
+          create: {
+            locationId: dubrovnikLocation.id,
+            activityType: 'Water Sports',
+            skillLevel: 'Intermediate',
+            equipment: ['Kayak', 'Paddle', 'Life jacket', 'Dry bag'],
+            ageRestriction: 'Minimum age 12',
+            seasonality: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+          },
+        },
+      },
+    });
+
+    console.log('✅ Services with locations (4 services created)');
+  }
+
   console.log('\n🎉 Database seeded successfully!\n');
   console.log('📋 Test Accounts:');
   console.log('   Admin:    admin@croffers.com / password123');
   console.log('   Tourist:  john@example.com / password123 (Premium)');
   console.log('   Tourist:  sarah@example.com / password123 (Free)');
   console.log('   Supplier: supplier@example.com / password123');
+  console.log('\n🏨 Services:');
+  console.log('   • Luxury Villa Dubrovnik (€250/night)');
+  console.log('   • Split City Walking Tour (€35)');
+  console.log('   • Modern Apartment Split (€120/night)');
+  console.log('   • Dubrovnik Sea Kayaking (€55)');
   console.log('\n🚀 API: http://localhost:3333/api/v1');
   console.log('📚 Docs: http://localhost:3333/api/docs\n');
 }
